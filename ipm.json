@@ -5,7 +5,7 @@
   "image_url": "https://docs.clearblade.com/v/4/static/img/default_package.png",
   "keywords": [],
   "license": "MIT",
-  "name": "{{component_id}}",
+  "name": "PredictiveForecasting",
   "private": false,
   "version": "1.0.0",
   "repository": {

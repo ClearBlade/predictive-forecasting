@@ -17,23 +17,23 @@
         "CodeServices": [
             {
                 "Level": 1,
-                "Name": "{{component_prefix}}_install"
+                "Name": "c1750108753331_install"
             },
             {
                 "Level": 1,
-                "Name": "{{component_prefix}}_setup"
+                "Name": "c1750108753331_setup"
             },
             {
                 "Level": 1,
-                "Name": "{{component_prefix}}_teardown"
+                "Name": "c1750108753331_teardown"
             },
             {
                 "Level": 1,
-                "Name": "{{component_prefix}}_uninstall"
+                "Name": "c1750108753331_uninstall"
             },
             {
                 "Level": 1,
-                "Name": "{{component_prefix}}_update"
+                "Name": "c1750108753331_update"
             }
         ],
         "Collections": [],

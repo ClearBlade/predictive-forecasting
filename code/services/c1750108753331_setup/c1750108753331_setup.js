@@ -1,6 +1,6 @@
 /**
  * Type: Micro Service
- * Description: Teardown action service for cleaning up any resources created in the setup service
+ * Description: Setup action service for creating ClearBlade Entities that cannot be a part of the component repository (e.g. Secrets, External DBs, etc.)
  * Runs as: Developer
  * @param {CbServer.BasicReq} req
  * @param {string} req.systemKey
@@ -13,8 +13,8 @@
  * @param {CbServer.Resp} resp
  */
 
-function {{component_prefix}}_teardown(req, resp) {
+function c1750108753331_setup(req, resp) {
   const params = req.params;
-  //component teardown behavior here. Undo any setup done in the setup service
+  //component setup behavior here initialize any external databases, bucket sets, etc.
   resp.success('Success');
 }

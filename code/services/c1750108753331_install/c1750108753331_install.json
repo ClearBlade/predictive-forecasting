@@ -6,7 +6,7 @@
   "execution_timeout": 60,
   "log_ttl_minutes": 10080,
   "logging_enabled": false,
-  "name": "{{component_prefix}}_update",
+  "name": "c1750108753331_install",
   "params": [""],
   "run_on_edge": true,
   "run_on_platform": true,
