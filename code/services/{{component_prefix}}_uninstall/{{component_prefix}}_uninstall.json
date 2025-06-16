@@ -1,0 +1,16 @@
+{
+    "auto_balance": false,
+    "auto_restart": null,
+    "concurrency": 0,
+    "dependencies": "log",
+    "execution_timeout": 60,
+    "log_ttl_minutes": 10080,
+    "logging_enabled": false,
+    "name": "{{component_prefix}}_uninstall",
+    "params": [
+        ""
+    ],
+    "run_on_edge": true,
+    "run_on_platform": true,
+    "run_user": ""
+}

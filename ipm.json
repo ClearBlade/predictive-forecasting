@@ -1,0 +1,19 @@
+{
+  "author": "ClearBlade",
+  "description": "Component description",
+  "homepage": "",
+  "image_url": "https://docs.clearblade.com/v/4/static/img/default_package.png",
+  "keywords": [],
+  "license": "MIT",
+  "name": "{{component_id}}",
+  "private": false,
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ClearBlade/components-template.git"
+  },
+  "engines": {
+    "ia": ">=0.0.1 <14",
+    "platform": ">0.0.1 <14"
+  }
+}

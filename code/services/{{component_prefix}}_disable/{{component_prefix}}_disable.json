@@ -1,0 +1,14 @@
+{
+  "auto_balance": false,
+  "auto_restart": null,
+  "concurrency": 0,
+  "dependencies": "log,clearblade_async",
+  "execution_timeout": 60,
+  "log_ttl_minutes": 10080,
+  "logging_enabled": false,
+  "name": "{{component_prefix}}_disable",
+  "params": [""],
+  "run_on_edge": true,
+  "run_on_platform": true,
+  "run_user": ""
+}

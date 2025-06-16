@@ -1,0 +1,62 @@
+name: REPLACE_TEMPLATE_VARIABLES
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  replace-variables:
+    if: github.run_number == 1 && github.event.repository.name != 'components-template'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up variables
+        id: generate
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          # Strip special characters and spaces, convert to camelCase
+          ID=$(echo "$REPO_NAME" | sed -E 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | sed -E 's/^[0-9]+//g' | sed -E 's/-([a-z0-9])/\U\1/g' | sed -E 's/^./\U&/')
+          # Create unique prefix using millisecond timestamp
+          TIMESTAMP=$(date +%s%N | cut -b1-13)
+          PREFIX="c${TIMESTAMP}"
+          echo "PREFIX=$PREFIX" >> $GITHUB_OUTPUT
+          echo "ID=$ID" >> $GITHUB_OUTPUT
+
+      - name: Rename directories, files, and update content
+        run: |
+          PREFIX=${{ steps.generate.outputs.PREFIX }}
+          ID=${{ steps.generate.outputs.ID }}
+
+          echo "Using PREFIX=$PREFIX, and ID=$ID"
+
+          find . -type f ! -name 'REPLACE_TEMPLATE_VARIABLES.yml' -exec sed -i "s/{{component_id}}/$ID/g" {} +
+          find . -type f ! -name 'REPLACE_TEMPLATE_VARIABLES.yml' -exec sed -i "s/{{component_prefix}}/$PREFIX/g" {} +
+
+          find . -depth -name '*{{component_prefix}}*' -execdir bash -c 'mv "$1" "${1//\{\{component_prefix\}\}/$2}"' _ {} "$PREFIX" \;
+          find . -depth -name '*{{component_id}}*' -execdir bash -c 'mv "$1" "${1//\{\{component_id\}\}/$2}"' _ {} "$ID" \;
+
+      - name: Clear and Rebuild Git Index
+        run: |
+          echo "Clearing Git index"
+          rm -f .git/index
+          git reset
+     
+      - name: Commit changes
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add .
+          git commit -m "Replaced Template Variables"
+          git push
+
+      - name: Create and push tag
+        run: |
+          git tag v1.0.0
+          git push origin v1.0.0
