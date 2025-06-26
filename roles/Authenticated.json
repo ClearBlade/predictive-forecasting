@@ -17,26 +17,37 @@
         "CodeServices": [
             {
                 "Level": 1,
-                "Name": "c1750108753331_install"
+                "Name": "forecast_install"
             },
             {
                 "Level": 1,
-                "Name": "c1750108753331_setup"
+                "Name": "forecast_setup"
             },
             {
                 "Level": 1,
-                "Name": "c1750108753331_teardown"
+                "Name": "forecast_teardown"
             },
             {
                 "Level": 1,
-                "Name": "c1750108753331_uninstall"
+                "Name": "forecast_uninstall"
             },
             {
                 "Level": 1,
-                "Name": "c1750108753331_update"
+                "Name": "forecast_update"
+            },
+            {
+                "Level": 1,
+                "Name": "forecast_forecastManager"
             }
         ],
-        "Collections": [],
+        "Collections": [
+            {
+                "Columns": null,
+                "Items": null,
+                "Level": 15,
+                "Name": "forecast_ml_pipelines"
+            }
+        ],
         "Deployments": {
             "Level": 0
         },
