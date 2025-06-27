@@ -1,0 +1,70 @@
+{
+    "indexes": {
+        "Total": 1,
+        "Data": [
+            {
+                "name": "asset_type_id",
+                "type": "Unique Index"
+            }
+        ]
+    },
+    "items": [],
+    "name": "forecast_ml_pipelines",
+    "schema": [
+        {
+            "ColumnName": "item_id",
+            "ColumnType": "uuid",
+            "PK": true
+        },
+        {
+            "ColumnName": "asset_type_id",
+            "ColumnType": "string",
+            "PK": false
+        },
+        {
+            "ColumnName": "attributes_to_predict",
+            "ColumnType": "jsonb",
+            "PK": false
+        },
+        {
+            "ColumnName": "supporting_attributes",
+            "ColumnType": "jsonb",
+            "PK": false
+        },
+        {
+            "ColumnName": "asset_management_data",
+            "ColumnType": "jsonb",
+            "PK": false
+        },
+        {
+            "ColumnName": "forecast_refresh_rate",
+            "ColumnType": "int",
+            "PK": false
+        },
+        {
+            "ColumnName": "retrain_frequency",
+            "ColumnType": "int",
+            "PK": false
+        },
+        {
+            "ColumnName": "forecast_length",
+            "ColumnType": "int",
+            "PK": false
+        },
+        {
+            "ColumnName": "timestep",
+            "ColumnType": "int",
+            "PK": false
+        },
+        {
+            "ColumnName": "forecast_start_date",
+            "ColumnType": "timestamp",
+            "PK": false
+        },
+        {
+            "ColumnName": "latest_settings_update",
+            "ColumnType": "timestamp",
+            "PK": false
+        }
+    ]
+}

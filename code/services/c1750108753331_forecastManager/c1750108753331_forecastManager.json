@@ -2,11 +2,11 @@
     "auto_balance": false,
     "auto_restart": null,
     "concurrency": 0,
-    "dependencies": "log,clearblade_async,mqtt",
+    "dependencies": "log,clearblade_async",
     "execution_timeout": 60,
     "log_ttl_minutes": 10080,
     "logging_enabled": true,
-    "name": "c1750108753331_uninstall",
+    "name": "c1750108753331_forecastManager",
     "params": [
         ""
     ],
