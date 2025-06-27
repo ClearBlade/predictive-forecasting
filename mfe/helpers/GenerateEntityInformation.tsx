@@ -1,81 +1,44 @@
 import { Grid, Typography } from "@material-ui/core";
 import { Alert } from "@material-ui/lab";
 import React, { Component } from "react";
-import { ComponentSettings } from "../settings";
 
 function GenerateEntityInformation({
   componentLabel,
   assetTypeLabel,
   settings,
+  isEditing,
 }: {
   componentLabel: string;
   assetTypeLabel: string;
   settings: Record<string, any>;
+  isEditing?: boolean;
 }) {
   return (
     <Grid container>
       <Grid item xs={12}>
         <Alert variant="outlined" severity="info">
           <Typography variant="body2">
-            {`Adding the ${componentLabel} component to ${assetTypeLabel} asset type will create the following: `}
+            {!isEditing
+              ? `Adding ${componentLabel} to "${assetTypeLabel}" asset type creates the following: `
+              : `${componentLabel} for "${assetTypeLabel}" asset type includes the following: `}
           </Typography>
           <ul style={{ marginTop: 0, paddingLeft: "20px" }}>
-            {settings?.attributes?.length > 0 && (
+            {/* {settings?.custom_start_date && (
               <li>
                 <span
                   style={{ fontWeight: "bold" }}
-                >{`${settings.attributes.length} attribute(s) - `}</span>
-                {`${settings.attributes
-                  .map((a) => `"${a.attribute_label}"`)
-                  .join(", ")}`}
+                >{`You have selected a custom start date of `}</span>
+                {`${settings.forecast_start_date}, but the actual forecast will start once the historical data threshold is met.`}
               </li>
-            )}
-            {settings?.ruleTypes?.length > 0 && (
+            )} */}
+            {settings?.attributes_to_predict?.length > 0 && (
               <li>
                 <span
                   style={{ fontWeight: "bold" }}
-                >{`${settings.ruleTypes.length} rule type(s) - `}</span>
-                {`${settings.ruleTypes
-                  .map(
-                    (a) =>
-                      `"${a.label.replaceAll(
-                        "{asset_type_label}",
-                        assetTypeLabel
-                      )}"`
-                  )
+                >{`${settings.attributes_to_predict.length} attribute(s) - `}</span>
+                {`${settings.attributes_to_predict
+                  .map((a) => `"Predicted ${a.attribute_label}"`)
                   .join(", ")}`}
-              </li>
-            )}
-            {settings?.rules?.length > 0 && (
-              <li>
-                <span
-                  style={{ fontWeight: "bold" }}
-                >{`${settings.rules.length} rule(s) - `}</span>
-                {`${settings.rules
-                  .map(
-                    (a) =>
-                      `"${a.label.replaceAll(
-                        "{asset_type_label}",
-                        assetTypeLabel
-                      )}"`
-                  )
-                  .join(", ")}`}
-              </li>
-            )}
-            {settings?.eventTypes?.length > 0 && (
-              <li>
-                <span
-                  style={{ fontWeight: "bold" }}
-                >{`${settings.eventTypes.length} event type(s) - `}</span>
-                {`${settings.eventTypes
-                  .map(
-                    (a) =>
-                      `"${a.label.replaceAll(
-                        "{asset_type_label}",
-                        assetTypeLabel
-                      )}"`
-                  )
-                  .join()}`}
               </li>
             )}
           </ul>

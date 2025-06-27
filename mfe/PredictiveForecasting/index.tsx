@@ -6,13 +6,16 @@ import ReactDOM from "react-dom";
 import { BrowserRouter } from "react-router-dom";
 import singleSpaReact from "single-spa-react";
 import PredictiveForecasting from "./PredictiveForecasting";
+import { SnackbarProvider } from "../context/SnackbarContext";
 
 function PredictiveForecastingRoot(props) {
   return (
     <AppProviders>
       <BrowserRouter basename={getBasePath()}>
         <Subscribe>
-          <PredictiveForecasting {...props} />
+          <SnackbarProvider>
+            <PredictiveForecasting {...props} />
+          </SnackbarProvider>
         </Subscribe>
       </BrowserRouter>
     </AppProviders>
