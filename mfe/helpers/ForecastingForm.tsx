@@ -10,6 +10,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Button,
 } from "@material-ui/core";
 import { ComponentsProps } from "../types";
 import { Autocomplete } from "@material-ui/lab";
@@ -40,6 +41,9 @@ const useStyles = makeStyles((theme) => ({
   },
   gridHorizontalSpacing: {
     paddingBottom: theme.spacing(2),
+    paddingTop: theme.spacing(2),
+  },
+  buttonPadding: {
     paddingTop: theme.spacing(2),
   },
 }));
@@ -458,84 +462,33 @@ export default function ForecastingForm(
                           </IconButton>
                         </Tooltip>
                       </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                      >
-                        <Autocomplete
-                          multiple
-                          fullWidth
-                          size="small"
-                          limitTags={6}
-                          id="multiple-limit-tags"
-                          value={values.settings.attributes_to_predict}
-                          options={schemaOptions}
-                          onChange={(event, newValue) =>
-                            setFieldValue(
-                              "settings.attributes_to_predict",
-                              newValue
-                            )
-                          }
-                          getOptionSelected={(option, value) =>
-                            option.uuid === value.uuid
-                          }
-                          getOptionLabel={(option) =>
-                            (option.attribute_label as string) ||
-                            (option.attribute_name as string)
-                          }
-                          renderInput={(params) => (
-                            <TextField {...params} variant="outlined" />
-                          )}
-                          disableCloseOnSelect
-                          disabled={recommendationFetching}
-                        />
-                        <Tooltip title="Auto-select attributes using AI">
-                          <IconButton
-                            size="small"
-                            style={{ marginLeft: "8px" }}
-                            onClick={async () => {
-                              try {
-                                const attributeNames =
-                                  getAttributeNames(schemaOptions);
-
-                                if (attributeNames.length > 0) {
-                                  const data =
-                                    await getAttributesToPredict(
-                                      attributeNames
-                                    );
-                                  if (data) {
-                                    setFieldValue(
-                                      "settings.attributes_to_predict",
-                                      schemaOptions.filter((attribute) =>
-                                        data.attributes_to_predict.includes(
-                                          attribute.attribute_label as string
-                                        )
-                                      )
-                                    );
-                                    setFieldValue(
-                                      "settings.supporting_attributes",
-                                      schemaOptions.filter((attribute) =>
-                                        data.supporting_attributes.includes(
-                                          attribute.attribute_label as string
-                                        )
-                                      )
-                                    );
-                                  }
-                                }
-                              } catch (error) {
-                                console.error(
-                                  "Error fetching recommendations:",
-                                  error
-                                );
-                              }
-                            }}
-                          >
-                            <AISparkleIcon style={{ fontSize: 24 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </div>
+                      <Autocomplete
+                        multiple
+                        fullWidth
+                        size="small"
+                        limitTags={6}
+                        id="multiple-limit-tags"
+                        value={values.settings.attributes_to_predict}
+                        options={schemaOptions}
+                        onChange={(event, newValue) =>
+                          setFieldValue(
+                            "settings.attributes_to_predict",
+                            newValue
+                          )
+                        }
+                        getOptionSelected={(option, value) =>
+                          option.uuid === value.uuid
+                        }
+                        getOptionLabel={(option) =>
+                          (option.attribute_label as string) ||
+                          (option.attribute_name as string)
+                        }
+                        renderInput={(params) => (
+                          <TextField {...params} variant="outlined" />
+                        )}
+                        disableCloseOnSelect
+                        disabled={recommendationFetching}
+                      />
                     </FormControl>
                   </Grid>
 
@@ -617,6 +570,18 @@ export default function ForecastingForm(
                         </Tooltip> */}
                       </div>
                     </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} className={classes.buttonPadding}>
+                    <Tooltip title="Auto-select attributes using AI">
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        startIcon={<AISparkleIcon style={{ fontSize: 20 }} />}
+                      >
+                        <Typography variant="body2">Regenerate</Typography>
+                      </Button>
+                    </Tooltip>
                   </Grid>
 
                   <Grid item xs={12} className={classes.gridHorizontalSpacing}>
@@ -743,7 +708,7 @@ export default function ForecastingForm(
                     </FormControl>
                   </Grid>
 
-                  <Grid item md={6} xs={12}>
+                  {/* <Grid item md={6} xs={12}>
                     <FormControl margin="normal">
                       <div
                         style={{
@@ -825,7 +790,7 @@ export default function ForecastingForm(
                     </Grid>
                   ) : (
                     <Grid item md={6} xs={12} />
-                  )}
+                  )} */}
 
                   <Grid item md={6} xs={12}>
                     <FormControl fullWidth margin="normal">
