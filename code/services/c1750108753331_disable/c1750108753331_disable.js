@@ -12,11 +12,11 @@
  * @param {CbServer.Resp} resp
  */
 
-function c1750108753331_uninstall(req, resp) {
+function c1750108753331_disable(req, resp) {
   /** @type {entity_id: string, component_id: string, mfe_settings: Record<string, unknown>} */
   const params = req.params;
   const mfe_settings = params.mfe_settings;
   log('mfe_settings: ', mfe_settings);
-  //component uninstall behavior here. Uninstall the component resources
+  //component disable behavior here. Disable the component resources
   resp.success('Success');
 }
