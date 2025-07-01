@@ -42,7 +42,7 @@
             "PK": false
         },
         {
-            "ColumnName": "retraining_frequency",
+            "ColumnName": "retrain_frequency",
             "ColumnType": "int",
             "PK": false
         },

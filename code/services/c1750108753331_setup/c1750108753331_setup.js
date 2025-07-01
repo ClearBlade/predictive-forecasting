@@ -1,7 +1,6 @@
 /**
  * Type: Micro Service
- * Description: Enable action service for enabling the IA entities 
- * Runs as: IA User
+ * Description: A short-lived service which is expected to complete within a fixed period of time.
  * @param {CbServer.BasicReq} req
  * @param {string} req.systemKey
  * @param {string} req.systemSecret
@@ -9,14 +8,15 @@
  * @param {string} req.userid
  * @param {string} req.userToken
  * @param {boolean} req.isLogging
+ * @param {[id: string]} req.params
  * @param {CbServer.Resp} resp
  */
 
-function forecast_enable(req, resp) {
+function c1750108753331_setup(req, resp) {
   /** @type {entity_id: string, component_id: string, mfe_settings: Record<string, unknown>} */
   const params = req.params;
   const mfe_settings = params.mfe_settings;
-  console.log('mfe_settings: ', mfe_settings);
-  //component enable behavior here. Enable the component resources
+  log('mfe_settings: ', mfe_settings);
+  //component setup behavior here. Setup the component resources
   resp.success('Success');
-}
+} 

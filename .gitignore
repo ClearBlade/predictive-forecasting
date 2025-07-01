@@ -1,7 +1,7 @@
 node_modules
 .cb-cli
 secrets
-ts-output
+ts-output/*
 external-databases
 bucket-set*
 
