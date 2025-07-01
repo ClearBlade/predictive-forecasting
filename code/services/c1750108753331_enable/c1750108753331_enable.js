@@ -16,7 +16,7 @@ function c1750108753331_enable(req, resp) {
   /** @type {entity_id: string, component_id: string, mfe_settings: Record<string, unknown>} */
   const params = req.params;
   const mfe_settings = params.mfe_settings;
-  console.log('mfe_settings: ', mfe_settings);
+  log('mfe_settings: ', mfe_settings);
   //component enable behavior here. Enable the component resources
   resp.success('Success');
 }
