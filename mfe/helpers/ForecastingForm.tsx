@@ -11,12 +11,14 @@ import {
   Tooltip,
   Typography,
   Button,
+  Box,
 } from "@material-ui/core";
 import { ComponentsProps } from "../types";
 import { Autocomplete } from "@material-ui/lab";
 import { Field, Form, Formik } from "formik";
 import { useEffect, useState } from "react";
 import HelpIcon from "@material-ui/icons/Help";
+import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
 import GenerateEntityInformation from "./GenerateEntityInformation";
 import React from "react";
 import { useFetchAssetTypes } from "../api/useFetchAssetTypes";
@@ -452,7 +454,7 @@ export default function ForecastingForm(
                             </span>
                           </Typography>
                         </FormLabel>
-                        <Tooltip title='Choose the attributes you want to generate forecasts for. Each selected attribute will get a twin "Predicted {Attribute_Name}" attribute, calculated in real time based on past trends and correlations with other selected attributes.'>
+                        <Tooltip title='Choose the attributes you want to generate forecasts for. Each selected attribute will get a twin "Predicted {Attribute_Name}" attribute, calculated in real time based on past trends and correlations with other selected attributes. Only attributes with "Keep History" enabled in the asset type settings will be available for forecasting.'>
                           <IconButton
                             size="small"
                             aria-label="help"
@@ -578,8 +580,42 @@ export default function ForecastingForm(
                         variant="outlined"
                         color="primary"
                         startIcon={<AISparkleIcon style={{ fontSize: 20 }} />}
+                        onClick={async () => {
+                          const attributeNames = getAttributeNames(schema);
+
+                          if (attributeNames.length > 0) {
+                            try {
+                              const data =
+                                await getAttributesToPredict(attributeNames);
+
+                              if (data) {
+                                setFieldValue(
+                                  "settings.attributes_to_predict",
+                                  schema.filter((attribute) =>
+                                    data.attributes_to_predict.includes(
+                                      attribute.attribute_label as string
+                                    )
+                                  )
+                                );
+                                setFieldValue(
+                                  "settings.supporting_attributes",
+                                  schema.filter((attribute) =>
+                                    data.supporting_attributes.includes(
+                                      attribute.attribute_label as string
+                                    )
+                                  )
+                                );
+                              }
+                            } catch (error) {
+                              console.error(
+                                "Error fetching recommendations:",
+                                error
+                              );
+                            }
+                          }
+                        }}
                       >
-                        <Typography variant="body2">Regenerate</Typography>
+                        Regenerate
                       </Button>
                     </Tooltip>
                   </Grid>
@@ -850,6 +886,22 @@ export default function ForecastingForm(
                     </FormControl>
                   </Grid>
 
+                  <Grid item xs={12} className={classes.buttonPadding}>
+                    <Box
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <InfoOutlinedIcon color="primary" />
+                      <Typography variant="body2" color="textSecondary">
+                        Note: Forecasts will only start once the minimum number
+                        of data points have been collected.
+                      </Typography>
+                    </Box>
+                  </Grid>
+
                   <Grid item xs={12} className={classes.gridHorizontalSpacing}>
                     <Divider />
                   </Grid>
@@ -915,7 +967,11 @@ export default function ForecastingForm(
                   </Grid>
                   {values.settings.attributes_to_predict.length > 0 && (
                     <>
-                      <Grid item xs={12}>
+                      <Grid
+                        item
+                        xs={12}
+                        className={classes.gridHorizontalSpacing}
+                      >
                         <Divider />
                       </Grid>
                       <Grid item xs={12}>
@@ -926,7 +982,7 @@ export default function ForecastingForm(
                           Summary
                         </Typography>
                       </Grid>
-                      <Grid item xs={12}>
+                      <Grid item xs={12} className={classes.buttonPadding}>
                         <GenerateEntityInformation
                           componentLabel={component.name}
                           assetTypeLabel={
