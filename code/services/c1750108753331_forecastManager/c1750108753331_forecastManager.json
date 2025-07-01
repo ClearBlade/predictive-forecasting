@@ -6,11 +6,13 @@
     "execution_timeout": 60,
     "log_ttl_minutes": 10080,
     "logging_enabled": true,
-    "name": "c1750108753331_forecastManager",
+    "name": "cb_ForecastManager",
     "params": [
         ""
     ],
-    "run_on_edge": true,
+    "run_on_edge": false,
     "run_on_platform": true,
-    "run_user": ""
+    "run_user": "",
+    "engine_type": 0,
+    "log_level": "debug"
 }
