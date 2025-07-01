@@ -23,11 +23,9 @@ import DeleteIcon from "@material-ui/icons/Delete";
 import { getPlatformInfo } from "../utils/platformInfo";
 import { useDeleteComponent } from "../api/useDeleteComponent";
 import { useFetchComponentSettings } from "../api/useFetchComponentSettings";
-// import SettingsDialog from "./SettingsDialog";
 import { useFetchAssetTypes } from "../api/useFetchAssetTypes";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import ExpandLessIcon from "@material-ui/icons/ExpandLess";
-import Alert from "@material-ui/lab/Alert";
 import { useSnackbar } from "../context/SnackbarContext";
 import SettingsDialog from "./SettingsDialog";
 
@@ -116,21 +114,23 @@ const ComponentEntityCard = ({
     isLoading: assetTypeDataLoading,
     refetch: refetchAssetTypes,
   } = useFetchAssetTypes(entity.id);
-  const { mutate: deleteComponent } = useDeleteComponent({
-    onSuccess: () => {
-      queryClient.invalidateQueries(["configuredComponents"]);
-      queryClient.invalidateQueries(["componentEntities"]);
-      queryClient.invalidateQueries(["componentSettings"]);
-      queryClient.invalidateQueries(["assetTypes"]);
-      showSnackbar(
-        `Successfully removed attribute forecasting component from asset type ${entity.id}`,
-        "success"
-      );
-    },
-    onError: (error) => {
-      showSnackbar(error.message || "Failed to delete component", "error");
-    },
-  });
+  const { mutate: deleteComponent, isLoading: isDeletingComponent } =
+    useDeleteComponent({
+      onSuccess: () => {
+        queryClient.invalidateQueries(["configuredComponents"]);
+        queryClient.invalidateQueries(["componentEntities"]);
+        queryClient.invalidateQueries(["componentSettings"]);
+        queryClient.invalidateQueries(["assetTypes"]);
+        showSnackbar(
+          `Successfully removed attribute forecasting component from asset type "${entity.id}"`,
+          "success"
+        );
+        setIsDeleting(false);
+      },
+      onError: (error) => {
+        showSnackbar(error.message || "Failed to delete component", "error");
+      },
+    });
 
   if (componentSettingsLoading || assetTypeDataLoading) {
     return <CircularProgress />;
@@ -312,14 +312,17 @@ const ComponentEntityCard = ({
                   size="small"
                   color="primary"
                   onClick={() => {
-                    setIsDeleting(false);
                     deleteComponent({
                       componentId: "attribute_forecasting",
                       entityId: entity.id,
                     });
                   }}
                 >
-                  Delete
+                  {isDeletingComponent ? (
+                    <CircularProgress size={20} />
+                  ) : (
+                    "Delete"
+                  )}
                 </Button>
               </DialogActions>
             </Dialog>

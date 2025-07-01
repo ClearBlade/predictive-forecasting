@@ -17,19 +17,19 @@
         "CodeServices": [
             {
                 "Level": 1,
-                "Name": "forecast_install"
+                "Name": "c1750108753331_install"
             },
             {
                 "Level": 1,
-                "Name": "forecast_setup"
+                "Name": "c1750108753331_setup"
             },
             {
                 "Level": 1,
-                "Name": "forecast_teardown"
+                "Name": "c1750108753331_teardown"
             },
             {
                 "Level": 1,
-                "Name": "forecast_uninstall"
+                "Name": "c1750108753331_uninstall"
             },
             {
                 "Level": 1,

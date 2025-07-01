@@ -12,6 +12,7 @@ import {
   Typography,
   Button,
   Box,
+  CircularProgress,
 } from "@material-ui/core";
 import { ComponentsProps } from "../types";
 import { Autocomplete } from "@material-ui/lab";
@@ -575,49 +576,60 @@ export default function ForecastingForm(
                   </Grid>
 
                   <Grid item xs={12} className={classes.buttonPadding}>
-                    <Tooltip title="Auto-select attributes using AI">
-                      <Button
-                        variant="outlined"
-                        color="primary"
-                        startIcon={<AISparkleIcon style={{ fontSize: 20 }} />}
-                        onClick={async () => {
-                          const attributeNames = getAttributeNames(schema);
+                    <Box
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <Tooltip title="Auto-select attributes using AI">
+                        <Button
+                          variant="outlined"
+                          color="primary"
+                          startIcon={<AISparkleIcon style={{ fontSize: 20 }} />}
+                          disabled={recommendationFetching}
+                          onClick={async () => {
+                            const attributeNames =
+                              getAttributeNames(schemaOptions);
 
-                          if (attributeNames.length > 0) {
-                            try {
-                              const data =
-                                await getAttributesToPredict(attributeNames);
+                            if (attributeNames.length > 0) {
+                              try {
+                                const data =
+                                  await getAttributesToPredict(attributeNames);
 
-                              if (data) {
-                                setFieldValue(
-                                  "settings.attributes_to_predict",
-                                  schema.filter((attribute) =>
-                                    data.attributes_to_predict.includes(
-                                      attribute.attribute_label as string
+                                if (data) {
+                                  setFieldValue(
+                                    "settings.attributes_to_predict",
+                                    schemaOptions.filter((attribute) =>
+                                      data.attributes_to_predict.includes(
+                                        attribute.attribute_label as string
+                                      )
                                     )
-                                  )
-                                );
-                                setFieldValue(
-                                  "settings.supporting_attributes",
-                                  schema.filter((attribute) =>
-                                    data.supporting_attributes.includes(
-                                      attribute.attribute_label as string
+                                  );
+                                  setFieldValue(
+                                    "settings.supporting_attributes",
+                                    schemaOptions.filter((attribute) =>
+                                      data.supporting_attributes.includes(
+                                        attribute.attribute_label as string
+                                      )
                                     )
-                                  )
+                                  );
+                                }
+                              } catch (error) {
+                                console.error(
+                                  "Error fetching recommendations:",
+                                  error
                                 );
                               }
-                            } catch (error) {
-                              console.error(
-                                "Error fetching recommendations:",
-                                error
-                              );
                             }
-                          }
-                        }}
-                      >
-                        Regenerate
-                      </Button>
-                    </Tooltip>
+                          }}
+                        >
+                          Regenerate
+                        </Button>
+                      </Tooltip>
+                      {recommendationFetching && <CircularProgress size={20} />}
+                    </Box>
                   </Grid>
 
                   <Grid item xs={12} className={classes.gridHorizontalSpacing}>

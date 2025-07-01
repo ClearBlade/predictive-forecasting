@@ -35,9 +35,12 @@ function GenerateEntityInformation({
               <li>
                 <span
                   style={{ fontWeight: "bold" }}
-                >{`${settings.attributes_to_predict.length} attribute(s) - `}</span>
+                >{`${settings.attributes_to_predict.length * 3} attributes - `}</span>
                 {`${settings.attributes_to_predict
-                  .map((a) => `"Predicted ${a.attribute_label}"`)
+                  .map(
+                    (a) =>
+                      `"${a.attribute_label} Predicted", "${a.attribute_label} Predicted Upper", "${a.attribute_label} Predicted Lower"`
+                  )
                   .join(", ")}`}
               </li>
             )}
