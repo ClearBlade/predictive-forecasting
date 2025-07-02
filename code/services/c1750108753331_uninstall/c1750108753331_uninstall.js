@@ -142,12 +142,19 @@ function c1750108753331_uninstall(req, resp) {
   function removeForecastAttributes(assetTypeInfo, groupIds) {
     // Remove forecast attributes from asset type schema
     const schema = JSON.parse(assetTypeInfo.schema);
-    const newSchema = schema.filter(function(attr) {
+    var categories = assetTypeInfo.categories;
+    const newSchema = schema.filter(function (attr) {
       return !attr.attribute_name.startsWith('predicted_');
     });
-    
+    // remove all predicted_ attributes from categories
+    if (categories) {
+      categories[0].attributes = categories[0].attributes.filter(function (name) {
+        return !name.startsWith('predicted_');
+      });
+    }
     assetTypeInfo.schema = JSON.stringify(newSchema);
-    
+    assetTypeInfo.categories = categories;
+
     // Update asset type with removed attributes
     return fetch('https://' + cbmeta.platform_url + '/api/v/1/code/' + cbmeta.system_key + '/updateTableItems?id=assetTypes.update', {
       method: 'POST',

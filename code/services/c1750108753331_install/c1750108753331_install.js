@@ -234,9 +234,11 @@ function c1750108753331_install(req, resp) {
     });
 
     var newSchema = attributesToAdd.concat(schema);
-    names.forEach(function(name) {
-      categories[0].attributes.push(name);
-    });
+    if(categories) {
+      names.forEach(function(name) {
+        categories[0].attributes.push(name);
+      });
+    }
     assetTypeInfo.schema = JSON.stringify(newSchema);
     assetTypeInfo.categories = categories;
 
