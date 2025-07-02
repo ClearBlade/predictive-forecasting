@@ -185,7 +185,7 @@ function c1750108753331_update(req, resp) {
 
     var newSchema = attributesToAdd.concat(schema);
 
-    if (categories[0] && categories[0].attributes) {
+    if (categories && categories[0] && categories[0].attributes) {
       categories[0].attributes = categories[0].attributes.filter(function (attrName) {
         return !categoriesToRemove.includes(attrName);
       });
@@ -362,4 +362,4 @@ function c1750108753331_update(req, resp) {
       return Promise.resolve();
     });
   }).then(resp.success).catch(resp.error);
-} 
+}
