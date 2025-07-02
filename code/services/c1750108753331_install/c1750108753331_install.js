@@ -195,8 +195,8 @@ function c1750108753331_install(req, resp) {
       var feature_name = attribute.attribute_name;
 
       var predictedName = 'predicted_' + feature_name;
-      var upperName = 'predicted_' + feature_name + '_upper';
-      var lowerName = 'predicted_' + feature_name + '_lower';
+      var upperName = 'predicted_upper_' + feature_name;
+      var lowerName = 'predicted_lower_' + feature_name;
 
       names.push(predictedName);
       names.push(upperName);

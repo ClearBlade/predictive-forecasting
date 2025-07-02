@@ -111,8 +111,8 @@ function c1750108753331_update(req, resp) {
       currentAttributesToPredict.forEach(function (attribute) {
         var feature_name = attribute.attribute_name;
         currentPredictedNames.push('predicted_' + feature_name);
-        currentPredictedNames.push('predicted_' + feature_name + '_upper');
-        currentPredictedNames.push('predicted_' + feature_name + '_lower');
+        currentPredictedNames.push('predicted_upper_' + feature_name);
+        currentPredictedNames.push('predicted_lower_' + feature_name);
       });
     }
 
@@ -121,16 +121,16 @@ function c1750108753331_update(req, resp) {
       newAttributesToPredict.forEach(function (attribute) {
         var feature_name = attribute.attribute_name;
         newPredictedNames.push('predicted_' + feature_name);
-        newPredictedNames.push('predicted_' + feature_name + '_upper');
-        newPredictedNames.push('predicted_' + feature_name + '_lower');
+        newPredictedNames.push('predicted_upper_' + feature_name);
+        newPredictedNames.push('predicted_lower_' + feature_name);
       });
     }
 
     newAttributesToPredict.forEach(function (attribute) {
       var feature_name = attribute.attribute_name;
       var predictedName = 'predicted_' + feature_name;
-      var upperName = 'predicted_' + feature_name + '_upper';
-      var lowerName = 'predicted_' + feature_name + '_lower';
+      var upperName = 'predicted_upper_' + feature_name;
+      var lowerName = 'predicted_upper_' + feature_name;
 
       var isCurrentlyPredicted = currentPredictedNames.includes(predictedName);
       
