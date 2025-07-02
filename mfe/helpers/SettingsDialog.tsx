@@ -2,9 +2,6 @@ import {
   CircularProgress,
   DialogContent,
   DialogTitle,
-  MenuItem,
-  Snackbar,
-  TextField,
 } from "@material-ui/core";
 import { Button } from "@material-ui/core";
 import { Dialog, DialogActions } from "@material-ui/core";
@@ -16,6 +13,7 @@ import { useQueryClient } from "react-query";
 import { ComponentsProps } from "../types";
 import { useFetchAssetTypes } from "../api/useFetchAssetTypes";
 import ForecastingForm from "./ForecastingForm";
+import { useSnackbar } from "../context/SnackbarContext";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -43,9 +41,8 @@ const SettingsDialog = ({
     settings: component.settings || {},
     assetType: assetType,
   });
-  const [error, setError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
   const queryClient = useQueryClient();
+  const { showSnackbar } = useSnackbar();
 
   const { mutate: createComponent, isLoading: isCreatingComponent } =
     useCreateComponent({
@@ -56,10 +53,10 @@ const SettingsDialog = ({
           queryClient.invalidateQueries(["componentSettings"]),
         ]);
         setOpen(false);
+        showSnackbar(`Successfully added attribute forecasting`, "success");
       },
       onError: (error) => {
-        setError(true);
-        setErrorMessage("Error: " + error.message);
+        showSnackbar(error.message, "error");
       },
     });
 
@@ -72,19 +69,15 @@ const SettingsDialog = ({
           queryClient.invalidateQueries(["componentSettings"]),
         ]);
         setOpen(false);
+        showSnackbar(`Successfully updated attribute forecasting`, "success");
       },
       onError: (error) => {
-        setError(true);
-        setErrorMessage("Error: " + error.message);
+        showSnackbar(error.message, "error");
       },
     });
 
   const { data: assetTypes, isLoading: isLoadingAssetTypes } =
     useFetchAssetTypes();
-
-  // if (isLoadingAssetTypes) {
-  //   return <CircularProgress />;
-  // }
 
   if (!assetTypes) {
     return null;
@@ -128,9 +121,9 @@ const SettingsDialog = ({
           <Button
             onClick={async () => {
               if (!mfeData.assetType || mfeData.assetType.id === "") {
-                setError(true);
-                setErrorMessage(
-                  "An asset type needs to be selected to add Attribute Forecasting"
+                showSnackbar(
+                  "An asset type needs to be selected to add Attribute Forecasting",
+                  "error"
                 );
                 return;
               }
@@ -140,8 +133,7 @@ const SettingsDialog = ({
                 (mfeData.settings.asset_management_data as string[]).length ===
                   0
               ) {
-                setError(true);
-                setErrorMessage("Please select the assets to forecast");
+                showSnackbar("Please select the assets to forecast", "error");
                 return;
               }
 
@@ -150,8 +142,10 @@ const SettingsDialog = ({
                 (mfeData.settings.attributes_to_predict as string[]).length ===
                   0
               ) {
-                setError(true);
-                setErrorMessage("Please select the attributes to forecast");
+                showSnackbar(
+                  "Please select the attributes to forecast",
+                  "error"
+                );
                 return;
               }
 
@@ -183,13 +177,6 @@ const SettingsDialog = ({
           </Button>
         </DialogActions>
       </Dialog>
-      <Snackbar
-        open={error}
-        autoHideDuration={6000}
-        onClose={() => setError(false)}
-        message={errorMessage}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      />
     </>
   );
 };

@@ -23,14 +23,6 @@ function GenerateEntityInformation({
               : `${componentLabel} for "${assetTypeLabel}" asset type includes the following: `}
           </Typography>
           <ul style={{ marginTop: 0, paddingLeft: "20px" }}>
-            {/* {settings?.custom_start_date && (
-              <li>
-                <span
-                  style={{ fontWeight: "bold" }}
-                >{`You have selected a custom start date of `}</span>
-                {`${settings.forecast_start_date}, but the actual forecast will start once the historical data threshold is met.`}
-              </li>
-            )} */}
             {settings?.attributes_to_predict?.length > 0 && (
               <li>
                 <span
@@ -39,7 +31,7 @@ function GenerateEntityInformation({
                 {`${settings.attributes_to_predict
                   .map(
                     (a) =>
-                      `"${a.attribute_label} Predicted", "${a.attribute_label} Predicted Upper", "${a.attribute_label} Predicted Lower"`
+                      `"Predicted ${a.attribute_label}", "Predicted Upper ${a.attribute_label}", "Predicted Lower ${a.attribute_label}"`
                   )
                   .join(", ")}`}
               </li>

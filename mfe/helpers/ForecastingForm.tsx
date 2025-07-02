@@ -472,7 +472,16 @@ export default function ForecastingForm(
                         limitTags={6}
                         id="multiple-limit-tags"
                         value={values.settings.attributes_to_predict}
-                        options={schemaOptions}
+                        options={schemaOptions.filter(
+                          (attribute) =>
+                            !values.settings.supporting_attributes.some(
+                              (selectedAttribute) =>
+                                (selectedAttribute as Record<string, any>)
+                                  .attribute_label ===
+                                (attribute as Record<string, any>)
+                                  .attribute_label
+                            )
+                        )}
                         onChange={(event, newValue) =>
                           setFieldValue(
                             "settings.attributes_to_predict",
@@ -906,7 +915,7 @@ export default function ForecastingForm(
                         gap: "8px",
                       }}
                     >
-                      <InfoOutlinedIcon color="primary" />
+                      <InfoOutlinedIcon color="primary" fontSize="medium" />
                       <Typography variant="body2" color="textSecondary">
                         Note: Forecasts will only start once the minimum number
                         of data points have been collected.
