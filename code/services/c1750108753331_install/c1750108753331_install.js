@@ -43,6 +43,8 @@ function c1750108753331_install(req, resp) {
         typeof payload.retrain_frequency === 'number' && payload.retrain_frequency > 0
           ? payload.retrain_frequency
           : 0;
+    } else {
+      retrain_frequency = 0;
     }
     if (payload.forecast_length) {
       forecast_length = payload.forecast_length;
