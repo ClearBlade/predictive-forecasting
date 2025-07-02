@@ -110,9 +110,9 @@ function c1750108753331_update(req, resp) {
     if (currentAttributesToPredict && Array.isArray(currentAttributesToPredict)) {
       currentAttributesToPredict.forEach(function (attribute) {
         var feature_name = attribute.attribute_name;
-        currentPredictedNames.push(feature_name + '_predicted');
-        currentPredictedNames.push(feature_name + '_predicted_upper');
-        currentPredictedNames.push(feature_name + '_predicted_lower');
+        currentPredictedNames.push('predicted_' + feature_name);
+        currentPredictedNames.push('predicted_' + feature_name + '_upper');
+        currentPredictedNames.push('predicted_' + feature_name + '_lower');
       });
     }
 
@@ -120,17 +120,17 @@ function c1750108753331_update(req, resp) {
     if (newAttributesToPredict && Array.isArray(newAttributesToPredict)) {
       newAttributesToPredict.forEach(function (attribute) {
         var feature_name = attribute.attribute_name;
-        newPredictedNames.push(feature_name + '_predicted');
-        newPredictedNames.push(feature_name + '_predicted_upper');
-        newPredictedNames.push(feature_name + '_predicted_lower');
+        currentPredictedNames.push('predicted_' + feature_name);
+        currentPredictedNames.push('predicted_' + feature_name + '_upper');
+        currentPredictedNames.push('predicted_' + feature_name + '_lower');
       });
     }
 
     newAttributesToPredict.forEach(function (attribute) {
       var feature_name = attribute.attribute_name;
-      var predictedName = feature_name + '_predicted';
-      var upperName = feature_name + '_predicted_upper';
-      var lowerName = feature_name + '_predicted_lower';
+      var predictedName = 'predicted_' + feature_name;
+      var upperName = 'predicted_' + feature_name + '_upper';
+      var lowerName = 'predicted_' + feature_name + '_lower';
 
       var isCurrentlyPredicted = currentPredictedNames.includes(predictedName);
       
@@ -149,7 +149,7 @@ function c1750108753331_update(req, resp) {
           attributesToAdd.push(Object.assign({}, attribute, {
             uuid: newUUID(),
             attribute_name: predictedName,
-            attribute_label: createForecastAttributeLabel(feature_name + ' predicted'),
+            attribute_label: createForecastAttributeLabel('predicted ' + feature_name),
           }));
           categoriesToAdd.push(predictedName);
         }
@@ -157,7 +157,7 @@ function c1750108753331_update(req, resp) {
           attributesToAdd.push(Object.assign({}, attribute, {
             uuid: newUUID(),
             attribute_name: upperName,
-            attribute_label: createForecastAttributeLabel(feature_name + ' predicted upper'),
+            attribute_label: createForecastAttributeLabel('predicted ' + feature_name + ' upper'),
           }));
           categoriesToAdd.push(upperName);
         }
@@ -165,7 +165,7 @@ function c1750108753331_update(req, resp) {
           attributesToAdd.push(Object.assign({}, attribute, {
             uuid: newUUID(),
             attribute_name: lowerName,
-            attribute_label: createForecastAttributeLabel(feature_name + ' predicted lower'),
+            attribute_label: createForecastAttributeLabel('predicted ' + feature_name + ' lower'),
           }));
           categoriesToAdd.push(lowerName);
         }
@@ -263,7 +263,7 @@ function c1750108753331_update(req, resp) {
         updateData.forecast_start_date = payload.forecast_start_date;
       }
 
-      if (payload.assets && Array.isArray(payload.assets)) {
+      if (payload.asset_management_data && Array.isArray(payload.asset_management_data)) {
         var shouldUpdateInferenceTime = false;
         var nextInferenceTime = currentTime;
         var baseNextTrainTime = currentTime;
@@ -297,7 +297,7 @@ function c1750108753331_update(req, resp) {
 
         var retrainingFreqChange = newRetrainingFreq - currentRetrainingFreq;
 
-        updateData.asset_management_data = payload.assets.map(function (asset) {
+        updateData.asset_management_data = payload.asset_management_data.map(function (asset) {
           var existingAsset = existingAssetMap[asset.id];
           
           if (existingAsset) {

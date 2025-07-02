@@ -57,7 +57,7 @@ function c1750108753331_install(req, resp) {
       forecast_start_date = payload.forecast_start_date;
     }
 
-    if (payload.assets && Array.isArray(payload.assets)) {
+    if (payload.asset_management_data && Array.isArray(payload.asset_management_data)) {
       const nextInferenceTime = forecast_start_date || currentTime;
 
       const nextInferenceDate = new Date(nextInferenceTime);
@@ -71,7 +71,7 @@ function c1750108753331_install(req, resp) {
         nextTrainTime = trainDate.toISOString();
       }
 
-      asset_management_data = payload.assets.map(function (asset) {
+      asset_management_data = payload.asset_management_data.map(function (asset) {
         return Object.assign({}, asset, {
           asset_model: null,
           last_inference_time: null,
@@ -192,9 +192,9 @@ function c1750108753331_install(req, resp) {
     attributes_to_predict.forEach(function (attribute) {
       var feature_name = attribute.attribute_name;
 
-      var predictedName = feature_name + '_predicted';
-      var upperName = feature_name + '_predicted_upper';
-      var lowerName = feature_name + '_predicted_lower';
+      var predictedName = 'predicted_' + feature_name;
+      var upperName = 'predicted_' + feature_name + '_upper';
+      var lowerName = 'predicted_' + feature_name + '_lower';
 
       names.push(predictedName);
       names.push(upperName);
@@ -214,21 +214,21 @@ function c1750108753331_install(req, resp) {
         attributesToAdd.push(Object.assign({}, attribute, {
           uuid: newUUID(),
           attribute_name: predictedName,
-          attribute_label: createForecastAttributeLabel(feature_name + ' predicted'),
+          attribute_label: createForecastAttributeLabel('predicted ' + feature_name),
         }));
       }
       if (!upperExists) {
         attributesToAdd.push(Object.assign({}, attribute, {
           uuid: newUUID(),
           attribute_name: upperName,
-          attribute_label: createForecastAttributeLabel(feature_name + ' predicted upper'),
+          attribute_label: createForecastAttributeLabel('predicted ' + feature_name + ' upper'),
         }));
       }
       if (!lowerExists) {
         attributesToAdd.push(Object.assign({}, attribute, {
           uuid: newUUID(),
           attribute_name: lowerName,
-          attribute_label: createForecastAttributeLabel(feature_name + ' predicted lower'),
+          attribute_label: createForecastAttributeLabel('predicted ' + feature_name + ' lower'),
         }));
       }
     });

@@ -49,9 +49,7 @@ function c1750108753331_uninstall(req, resp) {
     })
       .then(function (response) {
         if (!response.ok) {
-          return response.text().then(function (errorText) {
-            return Promise.reject('BigQuery API error: ' + response.status + ' - ' + errorText);
-          });
+          return Promise.reject('BigQuery API error: ' + response.status + ' - ' + response.text());
         }
         return response.json();
       })
@@ -145,10 +143,9 @@ function c1750108753331_uninstall(req, resp) {
     // Remove forecast attributes from asset type schema
     const schema = JSON.parse(assetTypeInfo.schema);
     const newSchema = schema.filter(function(attr) {
-      return !attr.attribute_name.endsWith('_predicted') && 
-             !attr.attribute_name.endsWith('_predicted_upper') && 
-             !attr.attribute_name.endsWith('_predicted_lower');
+      return !attr.attribute_name.startsWith('predicted_');
     });
+    
     assetTypeInfo.schema = JSON.stringify(newSchema);
     
     // Update asset type with removed attributes
