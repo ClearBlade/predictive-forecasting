@@ -120,9 +120,9 @@ function c1750108753331_update(req, resp) {
     if (newAttributesToPredict && Array.isArray(newAttributesToPredict)) {
       newAttributesToPredict.forEach(function (attribute) {
         var feature_name = attribute.attribute_name;
-        currentPredictedNames.push('predicted_' + feature_name);
-        currentPredictedNames.push('predicted_' + feature_name + '_upper');
-        currentPredictedNames.push('predicted_' + feature_name + '_lower');
+        newPredictedNames.push('predicted_' + feature_name);
+        newPredictedNames.push('predicted_' + feature_name + '_upper');
+        newPredictedNames.push('predicted_' + feature_name + '_lower');
       });
     }
 
