@@ -43,8 +43,6 @@ function c1750108753331_install(req, resp) {
         typeof payload.retrain_frequency === 'number' && payload.retrain_frequency > 0
           ? payload.retrain_frequency
           : 0;
-    } else {
-      retrain_frequency = 0;
     }
     if (payload.forecast_length) {
       forecast_length = payload.forecast_length;
@@ -103,10 +101,6 @@ function c1750108753331_install(req, resp) {
       timestep: timestep,
       forecast_start_date: forecast_start_date,
       latest_settings_update: currentTime,
-    }).then(function () {
-      return client.publish('_forecast/_components/_install', JSON.stringify({
-        id: params.prefix + "_" + params.component_id,
-      }));
     }).catch(function(err) {
       throw err;
     });
