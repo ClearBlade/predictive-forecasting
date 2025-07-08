@@ -314,6 +314,9 @@ export default function ForecastingForm(
                                 error
                               );
                             }
+                          } else {
+                            setFieldValue("settings.attributes_to_predict", []);
+                            setFieldValue("settings.supporting_attributes", []);
                           }
                         }
                       }}
@@ -331,7 +334,7 @@ export default function ForecastingForm(
 
               {/* Show loading indicator when fetching recommendations in editing mode */}
               {!props.isEditing &&
-                recommendationLoading &&
+                (recommendationLoading || recommendationFetching) &&
                 selectedAssetTypeId && (
                   <Grid item xs={12}>
                     <div
@@ -349,9 +352,99 @@ export default function ForecastingForm(
                   </Grid>
                 )}
 
-              {assetTypeName !== "" && assetTypes && !recommendationLoading && (
-                <>
-                  {selectedAssetTypeId && (
+              {assetTypeName !== "" &&
+                assetTypes &&
+                !recommendationLoading &&
+                !recommendationFetching && (
+                  <>
+                    {selectedAssetTypeId && (
+                      <Grid item xs={12}>
+                        <FormControl fullWidth margin="normal">
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              marginBottom: "4px",
+                            }}
+                          >
+                            <FormLabel>
+                              <Typography variant="body2">
+                                <span style={{ fontWeight: "bold" }}>
+                                  Assets*
+                                </span>
+                              </Typography>
+                            </FormLabel>
+                            <Tooltip title="Select the assets you want to configure forecasting for. You can only select 15 assets.">
+                              <IconButton
+                                size="small"
+                                aria-label="help"
+                                style={{ marginLeft: "8px" }}
+                              >
+                                <HelpIcon style={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Tooltip>
+                          </div>
+                          <Autocomplete
+                            multiple
+                            size="small"
+                            limitTags={6}
+                            id="multiple-limit-tags"
+                            value={values.settings.asset_management_data || []}
+                            options={assets || []}
+                            onChange={(event, newValue) => {
+                              if (newValue.length <= 15) {
+                                setFieldValue(
+                                  "settings.asset_management_data",
+                                  newValue
+                                );
+                              }
+                            }}
+                            getOptionSelected={(option, value) =>
+                              option.id === value.id
+                            }
+                            getOptionLabel={(option) =>
+                              (option.label as string) || (option.id as string)
+                            }
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                variant="outlined"
+                                helperText={`Selected ${(values.settings.asset_management_data || []).length}/15 assets`}
+                              />
+                            )}
+                            disableCloseOnSelect
+                            loading={assetsLoading || isFetchingNextPage}
+                            ListboxProps={{
+                              onScroll: (event) => {
+                                const listboxNode = event.currentTarget;
+                                if (
+                                  listboxNode.scrollTop +
+                                    listboxNode.clientHeight >=
+                                    listboxNode.scrollHeight - 5 &&
+                                  hasNextPage &&
+                                  !isFetchingNextPage
+                                ) {
+                                  fetchNextPage();
+                                }
+                              },
+                            }}
+                          />
+                          {isFetchingNextPage && (
+                            <div style={{ marginTop: "8px" }}>
+                              <LinearProgress />
+                              <Typography
+                                variant="caption"
+                                color="textSecondary"
+                                style={{ marginTop: "4px" }}
+                              >
+                                Loading more assets...
+                              </Typography>
+                            </div>
+                          )}
+                        </FormControl>
+                      </Grid>
+                    )}
+
                     <Grid item xs={12}>
                       <FormControl fullWidth margin="normal">
                         <div
@@ -364,11 +457,43 @@ export default function ForecastingForm(
                           <FormLabel>
                             <Typography variant="body2">
                               <span style={{ fontWeight: "bold" }}>
-                                Assets*
+                                Attributes to predict*
                               </span>
                             </Typography>
                           </FormLabel>
-                          <Tooltip title="Select the assets you want to configure forecasting for. You can only select 15 assets.">
+                          <Tooltip
+                            title={
+                              <>
+                                <p>
+                                  Choose the attributes you want to generate
+                                  forecasts for. Each selected attribute will
+                                  create three forecast attributes:
+                                </p>
+                                <ul>
+                                  <li>
+                                    {
+                                      "Predicted {Attribute_Name} - the expected value"
+                                    }
+                                  </li>
+                                  <li>
+                                    {
+                                      "Predicted {Attribute_Name} (Upper Bound) - the likely maximum value"
+                                    }
+                                  </li>
+                                  <li>
+                                    {
+                                      "Predicted {Attribute_Name} (Lower Bound) - the likely minimum value"
+                                    }
+                                  </li>
+                                </ul>
+                                <p>
+                                  Note: Only attributes with "Keep History"
+                                  enabled in the asset type settings will be
+                                  available for forecasting.
+                                </p>
+                              </>
+                            }
+                          >
                             <IconButton
                               size="small"
                               aria-label="help"
@@ -380,172 +505,14 @@ export default function ForecastingForm(
                         </div>
                         <Autocomplete
                           multiple
-                          size="small"
-                          limitTags={6}
-                          id="multiple-limit-tags"
-                          value={values.settings.asset_management_data || []}
-                          options={assets || []}
-                          onChange={(event, newValue) => {
-                            if (newValue.length <= 15) {
-                              setFieldValue(
-                                "settings.asset_management_data",
-                                newValue
-                              );
-                            }
-                          }}
-                          getOptionSelected={(option, value) =>
-                            option.id === value.id
-                          }
-                          getOptionLabel={(option) =>
-                            (option.label as string) || (option.id as string)
-                          }
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              variant="outlined"
-                              helperText={`Selected ${(values.settings.asset_management_data || []).length}/15 assets`}
-                            />
-                          )}
-                          disableCloseOnSelect
-                          loading={assetsLoading || isFetchingNextPage}
-                          ListboxProps={{
-                            onScroll: (event) => {
-                              const listboxNode = event.currentTarget;
-                              if (
-                                listboxNode.scrollTop +
-                                  listboxNode.clientHeight >=
-                                  listboxNode.scrollHeight - 5 &&
-                                hasNextPage &&
-                                !isFetchingNextPage
-                              ) {
-                                fetchNextPage();
-                              }
-                            },
-                          }}
-                        />
-                        {isFetchingNextPage && (
-                          <div style={{ marginTop: "8px" }}>
-                            <LinearProgress />
-                            <Typography
-                              variant="caption"
-                              color="textSecondary"
-                              style={{ marginTop: "4px" }}
-                            >
-                              Loading more assets...
-                            </Typography>
-                          </div>
-                        )}
-                      </FormControl>
-                    </Grid>
-                  )}
-
-                  <Grid item xs={12}>
-                    <FormControl fullWidth margin="normal">
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        <FormLabel>
-                          <Typography variant="body2">
-                            <span style={{ fontWeight: "bold" }}>
-                              Attributes to predict*
-                            </span>
-                          </Typography>
-                        </FormLabel>
-                        <Tooltip title='Choose the attributes you want to generate forecasts for. Each selected attribute will get a twin "Predicted {Attribute_Name}" attribute, calculated in real time based on past trends and correlations with other selected attributes. Only attributes with "Keep History" enabled in the asset type settings will be available for forecasting.'>
-                          <IconButton
-                            size="small"
-                            aria-label="help"
-                            style={{ marginLeft: "8px" }}
-                          >
-                            <HelpIcon style={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </div>
-                      <Autocomplete
-                        multiple
-                        fullWidth
-                        size="small"
-                        limitTags={6}
-                        id="multiple-limit-tags"
-                        value={values.settings.attributes_to_predict}
-                        options={schemaOptions.filter(
-                          (attribute) =>
-                            !values.settings.supporting_attributes.some(
-                              (selectedAttribute) =>
-                                (selectedAttribute as Record<string, any>)
-                                  .attribute_label ===
-                                (attribute as Record<string, any>)
-                                  .attribute_label
-                            )
-                        )}
-                        onChange={(event, newValue) =>
-                          setFieldValue(
-                            "settings.attributes_to_predict",
-                            newValue
-                          )
-                        }
-                        getOptionSelected={(option, value) =>
-                          option.uuid === value.uuid
-                        }
-                        getOptionLabel={(option) =>
-                          (option.attribute_label as string) ||
-                          (option.attribute_name as string)
-                        }
-                        renderInput={(params) => (
-                          <TextField {...params} variant="outlined" />
-                        )}
-                        disableCloseOnSelect
-                        disabled={recommendationFetching}
-                      />
-                    </FormControl>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <FormControl fullWidth margin="normal">
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        <FormLabel>
-                          <Typography variant="body2">
-                            <span style={{ fontWeight: "bold" }}>
-                              Supporting attributes
-                            </span>
-                          </Typography>
-                        </FormLabel>
-                        <Tooltip title="Optionally select additional attributes to factor into the forecast model. These will help influence the predictions, but won't have their own predicted values.">
-                          <IconButton
-                            size="small"
-                            aria-label="help"
-                            style={{ marginLeft: "8px" }}
-                          >
-                            <HelpIcon style={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                      >
-                        <Autocomplete
-                          multiple
                           fullWidth
                           size="small"
                           limitTags={6}
                           id="multiple-limit-tags"
-                          value={values.settings.supporting_attributes}
+                          value={values.settings.attributes_to_predict}
                           options={schemaOptions.filter(
                             (attribute) =>
-                              !values.settings.attributes_to_predict.some(
+                              !values.settings.supporting_attributes.some(
                                 (selectedAttribute) =>
                                   (selectedAttribute as Record<string, any>)
                                     .attribute_label ===
@@ -555,7 +522,7 @@ export default function ForecastingForm(
                           )}
                           onChange={(event, newValue) =>
                             setFieldValue(
-                              "settings.supporting_attributes",
+                              "settings.attributes_to_predict",
                               newValue
                             )
                           }
@@ -572,7 +539,78 @@ export default function ForecastingForm(
                           disableCloseOnSelect
                           disabled={recommendationFetching}
                         />
-                        {/* <Tooltip title="Auto-select attributes using AI">
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <FormControl fullWidth margin="normal">
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          <FormLabel>
+                            <Typography variant="body2">
+                              <span style={{ fontWeight: "bold" }}>
+                                Supporting attributes
+                              </span>
+                            </Typography>
+                          </FormLabel>
+                          <Tooltip title="Optionally select additional attributes to factor into the forecast model. These will help influence the predictions, but won't have their own predicted values.">
+                            <IconButton
+                              size="small"
+                              aria-label="help"
+                              style={{ marginLeft: "8px" }}
+                            >
+                              <HelpIcon style={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Autocomplete
+                            multiple
+                            fullWidth
+                            size="small"
+                            limitTags={6}
+                            id="multiple-limit-tags"
+                            value={values.settings.supporting_attributes}
+                            options={schemaOptions.filter(
+                              (attribute) =>
+                                !values.settings.attributes_to_predict.some(
+                                  (selectedAttribute) =>
+                                    (selectedAttribute as Record<string, any>)
+                                      .attribute_label ===
+                                    (attribute as Record<string, any>)
+                                      .attribute_label
+                                )
+                            )}
+                            onChange={(event, newValue) =>
+                              setFieldValue(
+                                "settings.supporting_attributes",
+                                newValue
+                              )
+                            }
+                            getOptionSelected={(option, value) =>
+                              option.uuid === value.uuid
+                            }
+                            getOptionLabel={(option) =>
+                              (option.attribute_label as string) ||
+                              (option.attribute_name as string)
+                            }
+                            renderInput={(params) => (
+                              <TextField {...params} variant="outlined" />
+                            )}
+                            disableCloseOnSelect
+                            disabled={recommendationFetching}
+                          />
+                          {/* <Tooltip title="Auto-select attributes using AI">
                           <IconButton
                             size="small"
                             style={{ marginLeft: "8px" }}
@@ -580,192 +618,209 @@ export default function ForecastingForm(
                             <AISparkleIcon style={{ fontSize: 24 }} />
                           </IconButton>
                         </Tooltip> */}
-                      </div>
-                    </FormControl>
-                  </Grid>
+                        </div>
+                      </FormControl>
+                    </Grid>
 
-                  <Grid item xs={12} className={classes.buttonPadding}>
-                    <Box
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}
-                    >
-                      <Tooltip title="Auto-select attributes using AI">
-                        <Button
-                          variant="outlined"
-                          color="primary"
-                          startIcon={<AISparkleIcon style={{ fontSize: 20 }} />}
-                          disabled={recommendationFetching}
-                          onClick={async () => {
-                            const attributeNames =
-                              getAttributeNames(schemaOptions);
+                    <Grid item xs={12} className={classes.buttonPadding}>
+                      <Box
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <Tooltip title="Auto-select attributes using AI">
+                          <Button
+                            variant="outlined"
+                            color="primary"
+                            startIcon={
+                              <AISparkleIcon style={{ fontSize: 20 }} />
+                            }
+                            disabled={recommendationFetching}
+                            onClick={async () => {
+                              const attributeNames =
+                                getAttributeNames(schemaOptions);
 
-                            if (attributeNames.length > 0) {
-                              try {
-                                const data =
-                                  await getAttributesToPredict(attributeNames);
+                              if (attributeNames.length > 0) {
+                                try {
+                                  const data =
+                                    await getAttributesToPredict(
+                                      attributeNames
+                                    );
 
-                                if (data) {
-                                  setFieldValue(
-                                    "settings.attributes_to_predict",
-                                    schemaOptions.filter((attribute) =>
-                                      data.attributes_to_predict.includes(
-                                        attribute.attribute_label as string
+                                  if (data) {
+                                    setFieldValue(
+                                      "settings.attributes_to_predict",
+                                      schemaOptions.filter((attribute) =>
+                                        data.attributes_to_predict.includes(
+                                          attribute.attribute_label as string
+                                        )
                                       )
-                                    )
-                                  );
-                                  setFieldValue(
-                                    "settings.supporting_attributes",
-                                    schemaOptions.filter((attribute) =>
-                                      data.supporting_attributes.includes(
-                                        attribute.attribute_label as string
+                                    );
+                                    setFieldValue(
+                                      "settings.supporting_attributes",
+                                      schemaOptions.filter((attribute) =>
+                                        data.supporting_attributes.includes(
+                                          attribute.attribute_label as string
+                                        )
                                       )
-                                    )
+                                    );
+                                  }
+                                } catch (error) {
+                                  console.error(
+                                    "Error fetching recommendations:",
+                                    error
                                   );
                                 }
-                              } catch (error) {
-                                console.error(
-                                  "Error fetching recommendations:",
-                                  error
-                                );
                               }
-                            }
-                          }}
-                        >
-                          Regenerate
-                        </Button>
-                      </Tooltip>
-                      {recommendationFetching && <CircularProgress size={20} />}
-                    </Box>
-                  </Grid>
-
-                  <Grid item xs={12} className={classes.gridHorizontalSpacing}>
-                    <Divider />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Typography variant="body1" style={{ fontWeight: "bold" }}>
-                      Time-based parameters
-                    </Typography>
-                  </Grid>
-
-                  <Grid item md={6} xs={12}>
-                    <FormControl fullWidth margin="normal">
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        <FormLabel>
-                          <Typography variant="body2">
-                            <span style={{ fontWeight: "bold" }}>
-                              Forecast length*
-                            </span>
-                          </Typography>
-                        </FormLabel>
-                        <Tooltip title="Define how far into the future you'd like forecasts to extend (e.g., 24 hours, 7 days). This determines the range of predicted values shown.">
-                          <IconButton
-                            size="small"
-                            aria-label="help"
-                            style={{ marginLeft: "8px" }}
+                            }}
                           >
-                            <HelpIcon style={{ fontSize: 16 }} />
-                          </IconButton>
+                            Regenerate
+                          </Button>
                         </Tooltip>
-                      </div>
-                      <Field
-                        select
-                        fullWidth
-                        size="small"
-                        value={convertToForecastLength(
-                          values.settings.forecast_length as number
+                        {recommendationFetching && (
+                          <CircularProgress size={20} />
                         )}
-                        name="settings.forecast_length"
-                        id="settings.forecast_length"
-                        component={TextField}
-                        onChange={(e) => {
-                          e.target.name = "settings.forecast_length";
-                          // Convert the selected string to days and store as number
-                          const daysValue = convertToDays(e.target.value);
-                          setFieldValue("settings.forecast_length", daysValue);
+                      </Box>
+                    </Grid>
 
-                          if (
-                            !isValidRefreshRate(
-                              convertToForecastLength(
-                                values.settings.forecast_refresh_rate as number
-                              ),
-                              e.target.value
-                            )
-                          ) {
-                            setFieldValue(
-                              "settings.forecast_refresh_rate",
-                              daysValue
-                            );
-                          } else {
-                            setFieldValue(
-                              "settings.forecast_refresh_rate",
-                              daysValue
-                            );
-                          }
-                        }}
-                        variant="outlined"
-                      >
-                        {intervals.map((option) => (
-                          <MenuItem value={option.label} key={option.label}>
-                            {option.label}
-                          </MenuItem>
-                        ))}
-                      </Field>
-                    </FormControl>
-                  </Grid>
+                    <Grid
+                      item
+                      xs={12}
+                      className={classes.gridHorizontalSpacing}
+                    >
+                      <Divider />
+                    </Grid>
 
-                  <Grid
-                    item
-                    md={6}
-                    xs={12}
-                    className={classes.gridVerticalSpacing}
-                  >
-                    <FormControl fullWidth margin="normal">
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        <FormLabel>
-                          <Typography variant="body2">
-                            <span style={{ fontWeight: "bold" }}>
-                              Data reporting frequency
-                            </span>
-                          </Typography>
-                        </FormLabel>
-                        <Tooltip title="This determines the time gap between each forecasted data point. This is optimized automatically based on your selected forecast length.">
-                          <IconButton
-                            size="small"
-                            aria-label="help"
-                            style={{ marginLeft: "8px" }}
-                          >
-                            <HelpIcon style={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </div>
+                    <Grid item xs={12}>
                       <Typography
                         variant="body1"
-                        className={classes.disabledText}
+                        style={{ fontWeight: "bold" }}
                       >
-                        {getForecastReportingFrequency(
-                          values.settings.forecast_length
-                        )}
+                        Time-based parameters
                       </Typography>
-                    </FormControl>
-                  </Grid>
+                    </Grid>
 
-                  {/* <Grid item md={6} xs={12}>
+                    <Grid item md={6} xs={12}>
+                      <FormControl fullWidth margin="normal">
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          <FormLabel>
+                            <Typography variant="body2">
+                              <span style={{ fontWeight: "bold" }}>
+                                Forecast length*
+                              </span>
+                            </Typography>
+                          </FormLabel>
+                          <Tooltip title="Define how far into the future you'd like forecasts to extend (e.g., 24 hours, 7 days). This determines the range of predicted values shown.">
+                            <IconButton
+                              size="small"
+                              aria-label="help"
+                              style={{ marginLeft: "8px" }}
+                            >
+                              <HelpIcon style={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </div>
+                        <Field
+                          select
+                          fullWidth
+                          size="small"
+                          value={convertToForecastLength(
+                            values.settings.forecast_length as number
+                          )}
+                          name="settings.forecast_length"
+                          id="settings.forecast_length"
+                          component={TextField}
+                          onChange={(e) => {
+                            e.target.name = "settings.forecast_length";
+                            // Convert the selected string to days and store as number
+                            const daysValue = convertToDays(e.target.value);
+                            setFieldValue(
+                              "settings.forecast_length",
+                              daysValue
+                            );
+
+                            if (
+                              !isValidRefreshRate(
+                                convertToForecastLength(
+                                  values.settings
+                                    .forecast_refresh_rate as number
+                                ),
+                                e.target.value
+                              )
+                            ) {
+                              setFieldValue(
+                                "settings.forecast_refresh_rate",
+                                daysValue
+                              );
+                            } else {
+                              setFieldValue(
+                                "settings.forecast_refresh_rate",
+                                daysValue
+                              );
+                            }
+                          }}
+                          variant="outlined"
+                        >
+                          {intervals.map((option) => (
+                            <MenuItem value={option.label} key={option.label}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </Field>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid
+                      item
+                      md={6}
+                      xs={12}
+                      className={classes.gridVerticalSpacing}
+                    >
+                      <FormControl fullWidth margin="normal">
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          <FormLabel>
+                            <Typography variant="body2">
+                              <span style={{ fontWeight: "bold" }}>
+                                Data reporting frequency
+                              </span>
+                            </Typography>
+                          </FormLabel>
+                          <Tooltip title="This determines the time gap between each forecasted data point. This is optimized automatically based on your selected forecast length.">
+                            <IconButton
+                              size="small"
+                              aria-label="help"
+                              style={{ marginLeft: "8px" }}
+                            >
+                              <HelpIcon style={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </div>
+                        <Typography
+                          variant="body1"
+                          className={classes.disabledText}
+                        >
+                          {getForecastReportingFrequency(
+                            values.settings.forecast_length
+                          )}
+                        </Typography>
+                      </FormControl>
+                    </Grid>
+
+                    {/* <Grid item md={6} xs={12}>
                     <FormControl margin="normal">
                       <div
                         style={{
@@ -849,174 +904,181 @@ export default function ForecastingForm(
                     <Grid item md={6} xs={12} />
                   )} */}
 
-                  <Grid item md={6} xs={12}>
-                    <FormControl fullWidth margin="normal">
-                      <div
+                    <Grid item md={6} xs={12}>
+                      <FormControl fullWidth margin="normal">
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          <FormLabel>
+                            <Typography variant="body2">
+                              <span style={{ fontWeight: "bold" }}>
+                                Forecast refresh rate
+                              </span>
+                            </Typography>
+                          </FormLabel>
+                          <Tooltip title="Choose how often the system refreshes the forecast using the most recent data. Recalibrating frequently helps maintain prediction accuracy as conditions change.">
+                            <IconButton
+                              size="small"
+                              aria-label="help"
+                              style={{ marginLeft: "8px" }}
+                            >
+                              <HelpIcon style={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </div>
+                        <Field
+                          select
+                          fullWidth
+                          size="small"
+                          value={convertToForecastLength(
+                            values.settings.forecast_refresh_rate as number
+                          )}
+                          name="settings.forecast_refresh_rate"
+                          id="settings.forecast_refresh_rate"
+                          component={TextField}
+                          onChange={(e) => {
+                            e.target.name = "settings.forecast_refresh_rate";
+                            // Convert the selected string to days and store as number
+                            const daysValue = convertToDays(e.target.value);
+                            setFieldValue(
+                              "settings.forecast_refresh_rate",
+                              daysValue
+                            );
+                          }}
+                          variant="outlined"
+                        >
+                          {getForecastRefreshRateOptions(
+                            values.settings.forecast_length
+                          ).map((option) => (
+                            <MenuItem value={option} key={option}>
+                              {option}
+                            </MenuItem>
+                          ))}
+                        </Field>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12} className={classes.buttonPadding}>
+                      <Box
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          marginBottom: "4px",
+                          gap: "8px",
                         }}
                       >
-                        <FormLabel>
-                          <Typography variant="body2">
-                            <span style={{ fontWeight: "bold" }}>
-                              Forecast refresh rate
-                            </span>
-                          </Typography>
-                        </FormLabel>
-                        <Tooltip title="Choose how often the system refreshes the forecast using the most recent data. Recalibrating frequently helps maintain prediction accuracy as conditions change.">
-                          <IconButton
-                            size="small"
-                            aria-label="help"
-                            style={{ marginLeft: "8px" }}
-                          >
-                            <HelpIcon style={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </div>
-                      <Field
-                        select
-                        fullWidth
-                        size="small"
-                        value={convertToForecastLength(
-                          values.settings.forecast_refresh_rate as number
-                        )}
-                        name="settings.forecast_refresh_rate"
-                        id="settings.forecast_refresh_rate"
-                        component={TextField}
-                        onChange={(e) => {
-                          e.target.name = "settings.forecast_refresh_rate";
-                          // Convert the selected string to days and store as number
-                          const daysValue = convertToDays(e.target.value);
-                          setFieldValue(
-                            "settings.forecast_refresh_rate",
-                            daysValue
-                          );
-                        }}
-                        variant="outlined"
-                      >
-                        {getForecastRefreshRateOptions(
-                          values.settings.forecast_length
-                        ).map((option) => (
-                          <MenuItem value={option} key={option}>
-                            {option}
-                          </MenuItem>
-                        ))}
-                      </Field>
-                    </FormControl>
-                  </Grid>
+                        <InfoOutlinedIcon color="primary" fontSize="medium" />
+                        <Typography variant="body2" color="textSecondary">
+                          Note: Forecasts will only start once the minimum
+                          number of data points have been collected.
+                        </Typography>
+                      </Box>
+                    </Grid>
 
-                  <Grid item xs={12} className={classes.buttonPadding}>
-                    <Box
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}
+                    <Grid
+                      item
+                      xs={12}
+                      className={classes.gridHorizontalSpacing}
                     >
-                      <InfoOutlinedIcon color="primary" fontSize="medium" />
-                      <Typography variant="body2" color="textSecondary">
-                        Note: Forecasts will only start once the minimum number
-                        of data points have been collected.
-                      </Typography>
-                    </Box>
-                  </Grid>
+                      <Divider />
+                    </Grid>
 
-                  <Grid item xs={12} className={classes.gridHorizontalSpacing}>
-                    <Divider />
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Typography variant="body1" style={{ fontWeight: "bold" }}>
-                      Model training settings
-                    </Typography>
-                  </Grid>
-
-                  <Grid item md={6} xs={12}>
-                    <FormControl fullWidth margin="normal">
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          marginBottom: "4px",
-                        }}
+                    <Grid item xs={12}>
+                      <Typography
+                        variant="body1"
+                        style={{ fontWeight: "bold" }}
                       >
-                        <FormLabel>
+                        Model training settings
+                      </Typography>
+                    </Grid>
+
+                    <Grid item md={6} xs={12}>
+                      <FormControl fullWidth margin="normal">
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          <FormLabel>
+                            <Typography
+                              variant="body2"
+                              style={{ fontWeight: "bold" }}
+                            >
+                              Retraining frequency
+                            </Typography>
+                          </FormLabel>
+                          <Tooltip title='Set how often the forecast model retrains using new data. Choose "automatic" to allow the system to trigger retraining based on changes in accuracy over time.'>
+                            <IconButton
+                              size="small"
+                              aria-label="help"
+                              style={{ marginLeft: "8px" }}
+                            >
+                              <HelpIcon style={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </div>
+                        <Field
+                          select
+                          fullWidth
+                          size="small"
+                          value={convertDaysToRetrainFrequency(
+                            values.settings.retrain_frequency
+                          )}
+                          name="settings.retrain_frequency"
+                          id="settings.retrain_frequency"
+                          component={TextField}
+                          onChange={(e) => {
+                            setFieldValue(
+                              "settings.retrain_frequency",
+                              convertRetrainFrequencyToDays(e.target.value)
+                            );
+                          }}
+                          variant="outlined"
+                        >
+                          {retrainFrequencyOptions.map((option) => (
+                            <MenuItem value={option.label} key={option.label}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </Field>
+                      </FormControl>
+                    </Grid>
+                    {values.settings.attributes_to_predict.length > 0 && (
+                      <>
+                        <Grid
+                          item
+                          xs={12}
+                          className={classes.gridHorizontalSpacing}
+                        >
+                          <Divider />
+                        </Grid>
+                        <Grid item xs={12}>
                           <Typography
-                            variant="body2"
+                            variant="body1"
                             style={{ fontWeight: "bold" }}
                           >
-                            Retraining frequency
+                            Summary
                           </Typography>
-                        </FormLabel>
-                        <Tooltip title='Set how often the forecast model retrains using new data. Choose "automatic" to allow the system to trigger retraining based on changes in accuracy over time.'>
-                          <IconButton
-                            size="small"
-                            aria-label="help"
-                            style={{ marginLeft: "8px" }}
-                          >
-                            <HelpIcon style={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </div>
-                      <Field
-                        select
-                        fullWidth
-                        size="small"
-                        value={convertDaysToRetrainFrequency(
-                          values.settings.retrain_frequency
-                        )}
-                        name="settings.retrain_frequency"
-                        id="settings.retrain_frequency"
-                        component={TextField}
-                        onChange={(e) => {
-                          setFieldValue(
-                            "settings.retrain_frequency",
-                            convertRetrainFrequencyToDays(e.target.value)
-                          );
-                        }}
-                        variant="outlined"
-                      >
-                        {retrainFrequencyOptions.map((option) => (
-                          <MenuItem value={option.label} key={option.label}>
-                            {option.label}
-                          </MenuItem>
-                        ))}
-                      </Field>
-                    </FormControl>
-                  </Grid>
-                  {values.settings.attributes_to_predict.length > 0 && (
-                    <>
-                      <Grid
-                        item
-                        xs={12}
-                        className={classes.gridHorizontalSpacing}
-                      >
-                        <Divider />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Typography
-                          variant="body1"
-                          style={{ fontWeight: "bold" }}
-                        >
-                          Summary
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} className={classes.buttonPadding}>
-                        <GenerateEntityInformation
-                          componentLabel={component.name}
-                          assetTypeLabel={
-                            assetTypeName || values.assetType?.label || ""
-                          }
-                          isEditing={props.isEditing}
-                          settings={values.settings}
-                        />
-                      </Grid>
-                    </>
-                  )}
-                </>
-              )}
+                        </Grid>
+                        <Grid item xs={12} className={classes.buttonPadding}>
+                          <GenerateEntityInformation
+                            componentLabel={component.name}
+                            assetTypeLabel={
+                              assetTypeName || values.assetType?.label || ""
+                            }
+                            isEditing={props.isEditing}
+                            settings={values.settings}
+                          />
+                        </Grid>
+                      </>
+                    )}
+                  </>
+                )}
             </Grid>
           </Form>
         );

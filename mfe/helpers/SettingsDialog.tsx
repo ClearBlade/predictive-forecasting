@@ -51,6 +51,7 @@ const SettingsDialog = ({
           queryClient.invalidateQueries(["configuredComponents"]),
           queryClient.invalidateQueries(["componentEntities"]),
           queryClient.invalidateQueries(["componentSettings"]),
+          queryClient.invalidateQueries(["assetTypes"]),
         ]);
         setOpen(false);
         showSnackbar(`Successfully added attribute forecasting`, "success");
@@ -67,6 +68,7 @@ const SettingsDialog = ({
           queryClient.invalidateQueries(["configuredComponents"]),
           queryClient.invalidateQueries(["componentEntities"]),
           queryClient.invalidateQueries(["componentSettings"]),
+          queryClient.invalidateQueries(["assetTypes"]),
         ]);
         setOpen(false);
         showSnackbar(`Successfully updated attribute forecasting`, "success");
