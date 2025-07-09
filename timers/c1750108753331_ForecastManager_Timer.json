@@ -1,0 +1,8 @@
+{
+    "description": "Runs the forecast manager service every 30 minutes to handle new training and inference pipelines as well as their artifacts post completion.",
+    "frequency": 1800,
+    "name": "c1750108753331_ForecastManager_Timer",
+    "repeats": -1,
+    "service_name": "c1750108753331_ForecastManager",
+    "start_time": "2025-07-09T16:00:00Z"
+}

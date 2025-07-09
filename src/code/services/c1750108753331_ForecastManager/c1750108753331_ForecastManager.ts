@@ -23,14 +23,13 @@ import {
   handleNewForecast,
   updatePipelineRows,
   PipelineData,
+  isThresholdMet,
 } from './utils';
 
 async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServer.Resp) {
-  console.log('Starting forecast pipeline management...');
-
   try {
     const currentTime = new Date();
-    const pipelines = await getPipelines();
+    const pipelines: PipelineData[] = await getPipelines();
     const updatedPipelines: PipelineData[] = [];
 
     for (const pipeline of pipelines) {
@@ -40,14 +39,16 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
         try {
           // Step 1: Check for new asset model
           const newAssetModel = await getAssetModel(asset.id);
-          if (newAssetModel !== asset.asset_model) {
+          if (newAssetModel && newAssetModel !== asset.asset_model) {
             asset.asset_model = newAssetModel;
             pipelineUpdated = true;
             console.log(`Updated asset model for ${asset.id}: ${newAssetModel}`);
           }
 
           // Step 2: Check if training pipeline should run
-          if (shouldRunTrainingPipeline(asset)) {
+          const thresholdMet = await isThresholdMet(asset.id, pipeline.timestep);
+          if (shouldRunTrainingPipeline(asset) && thresholdMet) {
+            console.log('Updating asset history!');
             await updateBQAssetHistory(pipeline, asset.id);
             const trainResult = await startTrainingPipeline(pipeline, asset);
 
@@ -65,17 +66,19 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
 
           // Step 3: Check if inference pipeline should run
           if (shouldRunInferencePipeline(asset)) {
+            console.log('Initializing inference pipeline');
             await updateBQAssetHistory(pipeline, asset.id);
             const inferenceResult = await startInferencePipeline(pipeline, asset);
-
             if (!inferenceResult.error) {
               asset.last_inference_time = currentTime.toISOString();
-              const nextInferenceTime = new Date(
-                currentTime.getTime() + pipeline.forecast_refresh_rate * 60 * 60 * 1000,
+              const forecast_length_days = pipeline.forecast_length;
+              const next_inference_time = new Date(
+                currentTime.getTime() +
+                  pipeline.forecast_refresh_rate * 60 * 60 * 1000 +
+                  forecast_length_days * 24 * 60 * 60 * 1000,
               );
-              asset.next_inference_time = nextInferenceTime.toISOString();
+              asset.next_inference_time = next_inference_time.toISOString();
               pipelineUpdated = true;
-              console.log(`Started inference pipeline for ${asset.id}`);
             } else {
               console.error(`Inference pipeline failed for ${asset.id}: ${inferenceResult.message}`);
             }
@@ -96,7 +99,6 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
     // Update all modified pipelines
     if (updatedPipelines.length > 0) {
       await updatePipelineRows(updatedPipelines);
-      console.log(`Updated ${updatedPipelines.length} pipelines`);
     }
 
     console.log('Forecast pipeline management completed successfully');
@@ -109,4 +111,4 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-global.cb_ForecastManager = cb_ForecastManager;
+global.c1750108753331_ForecastManager = c1750108753331_ForecastManager;
