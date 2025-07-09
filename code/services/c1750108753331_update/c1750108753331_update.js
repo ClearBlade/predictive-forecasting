@@ -110,9 +110,9 @@ function c1750108753331_update(req, resp) {
     if (currentAttributesToPredict && Array.isArray(currentAttributesToPredict)) {
       currentAttributesToPredict.forEach(function (attribute) {
         var feature_name = attribute.attribute_name;
-        currentPredictedNames.push('predicted_' + feature_name);
-        currentPredictedNames.push('predicted_upper_' + feature_name);
-        currentPredictedNames.push('predicted_lower_' + feature_name);
+        currentPredictedNames.push('predicted ' + feature_name);
+        currentPredictedNames.push('predicted ' + feature_name + ' upper bound');
+        currentPredictedNames.push('predicted ' + feature_name + ' lower bound');
       });
     }
 
@@ -120,17 +120,17 @@ function c1750108753331_update(req, resp) {
     if (newAttributesToPredict && Array.isArray(newAttributesToPredict)) {
       newAttributesToPredict.forEach(function (attribute) {
         var feature_name = attribute.attribute_name;
-        newPredictedNames.push('predicted_' + feature_name);
-        newPredictedNames.push('predicted_upper_' + feature_name);
-        newPredictedNames.push('predicted_lower_' + feature_name);
+        newPredictedNames.push('predicted ' + feature_name);
+        newPredictedNames.push('predicted ' + feature_name + ' upper bound');
+        newPredictedNames.push('predicted ' + feature_name + ' lower bound');
       });
     }
 
     newAttributesToPredict.forEach(function (attribute) {
       var feature_name = attribute.attribute_name;
-      var predictedName = 'predicted_' + feature_name;
-      var upperName = 'predicted_upper_' + feature_name;
-      var lowerName = 'predicted_upper_' + feature_name;
+      var predictedName = 'predicted ' + feature_name;
+      var upperName = 'predicted ' + feature_name + ' upper bound';
+      var lowerName = 'predicted ' + feature_name + ' lower bound';
 
       var isCurrentlyPredicted = currentPredictedNames.includes(predictedName);
       
@@ -149,7 +149,7 @@ function c1750108753331_update(req, resp) {
           attributesToAdd.push(Object.assign({}, attribute, {
             uuid: newUUID(),
             attribute_name: predictedName,
-            attribute_label: createForecastAttributeLabel('predicted ' + feature_name),
+            attribute_label: createForecastAttributeLabel('Predicted ' + feature_name),
           }));
           categoriesToAdd.push(predictedName);
         }
@@ -157,7 +157,7 @@ function c1750108753331_update(req, resp) {
           attributesToAdd.push(Object.assign({}, attribute, {
             uuid: newUUID(),
             attribute_name: upperName,
-            attribute_label: createForecastAttributeLabel('predicted ' + feature_name + ' upper'),
+            attribute_label: createForecastAttributeLabel('Predicted ' + feature_name + ' (Upper Bound)'),
           }));
           categoriesToAdd.push(upperName);
         }
@@ -165,7 +165,7 @@ function c1750108753331_update(req, resp) {
           attributesToAdd.push(Object.assign({}, attribute, {
             uuid: newUUID(),
             attribute_name: lowerName,
-            attribute_label: createForecastAttributeLabel('predicted ' + feature_name + ' lower'),
+            attribute_label: createForecastAttributeLabel('Predicted ' + feature_name + ' (Lower Bound)'),
           }));
           categoriesToAdd.push(lowerName);
         }
