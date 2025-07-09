@@ -26,7 +26,7 @@ function c1750108753331_install(req, resp) {
   }
 
   var forecast_refresh_rate = 7; 
-  var retrain_frequency = 14;
+  var retrain_frequency = 0;
   var forecast_length = 7;
   var timestep = 15;
   var attributes_to_predict = [];
@@ -38,11 +38,8 @@ function c1750108753331_install(req, resp) {
     if (payload.forecast_refresh_rate) {
       forecast_refresh_rate = payload.forecast_refresh_rate;
     }
-    if (payload.retrain_frequency) {
-      retrain_frequency =
-        typeof payload.retrain_frequency === 'number' && payload.retrain_frequency > 0
-          ? payload.retrain_frequency
-          : 0;
+    if (payload.retrain_frequency && typeof payload.retrain_frequency === 'number') {
+      retrain_frequency = payload.retrain_frequency;
     }
     if (payload.forecast_length) {
       forecast_length = payload.forecast_length;
