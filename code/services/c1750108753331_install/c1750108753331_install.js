@@ -16,7 +16,6 @@ function c1750108753331_install(req, resp) {
   const params = req.params;
   const payload = params.mfe_settings;
   const col = ClearBladeAsync.Collection('forecast_ml_pipelines');
-  const client = new MQTT.Client();
   const currentTime = new Date().toISOString();
 
   function createForecastAttributeLabel(attributeName) {
