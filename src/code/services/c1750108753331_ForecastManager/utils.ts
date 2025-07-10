@@ -752,11 +752,11 @@ const updateAssetHistoryWithForecasts = async (
             if (columnName.includes(attrName)) {
               let targetAttributeName: string;
               if (columnName.includes('upper')) {
-                targetAttributeName = `predicted ${attrName} upper bound`;
+                targetAttributeName = `predicted_${attrName}_upper_bound`;
               } else if (columnName.includes('lower')) {
-                targetAttributeName = `predicted ${attrName} lower bound`;
+                targetAttributeName = `predicted_${attrName}_lower_bound`;
               } else {
-                targetAttributeName = `predicted ${attrName}`;
+                targetAttributeName = `predicted_${attrName}`;
               }
               customData[targetAttributeName] = typeof value === 'number' ? value : parseFloat(String(value));
               break;
@@ -768,11 +768,11 @@ const updateAssetHistoryWithForecasts = async (
               let targetAttributeName: string;
 
               if (columnName.includes('upper')) {
-                targetAttributeName = `predicted ${attrName} upper bound`;
+                targetAttributeName = `predicted_${attrName}_upper_bound`;
               } else if (columnName.includes('lower')) {
-                targetAttributeName = `predicted ${attrName} lower bound`;
+                targetAttributeName = `predicted_${attrName}_lower_bound`;
               } else {
-                targetAttributeName = `predicted ${attrName}`;
+                targetAttributeName = `predicted_${attrName}`;
               }
               customData[targetAttributeName] = typeof value === 'number' ? value : parseFloat(String(value));
               break; // Found the attribute, no need to check others
