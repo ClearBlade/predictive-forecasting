@@ -3,7 +3,7 @@
     "auto_restart": null,
     "concurrency": 0,
     "dependencies": "log,clearblade_async",
-    "execution_timeout": 3600,
+    "execution_timeout": 600,
     "log_ttl_minutes": 10080,
     "logging_enabled": true,
     "name": "c1750108753331_ForecastManager",
