@@ -36,6 +36,7 @@ export interface PipelineData {
 }
 
 interface AssetHistoryRow {
+  item_id?: string;
   asset_id: string;
   change_date: string;
   changes: { custom_data: Record<string, number | boolean> };
@@ -793,6 +794,14 @@ const updateAssetHistoryWithForecasts = async (
     return false;
   }
 
+  const earliestUpdate = historyUpdates.reduce((earliest, current) =>
+    new Date(current.change_date) < new Date(earliest.change_date) ? current : earliest,
+  );
+  const cutoffTime = new Date(new Date(earliestUpdate.change_date).getTime() - 60 * 1000);
+
+  // Clear old forecast data before inserting new forecasts
+  await clearOldForecast(assetId, cutoffTime);
+
   // Batch insert the forecast data
   const batchSize = 48;
   for (let i = 0; i < historyUpdates.length; i += batchSize) {
@@ -812,6 +821,64 @@ const updateAssetHistoryWithForecasts = async (
   }
 
   return true;
+};
+
+// Clear old forecast data from asset history before inserting new forecasts
+const clearOldForecast = async (assetId: string, cutoffTime: Date): Promise<void> => {
+  try {
+    const col = ClearBladeAsync.Collection('_asset_history');
+    const query = ClearBladeAsync.Query()
+      .equalTo('asset_id', assetId)
+      .greaterThan('change_date', cutoffTime.toISOString())
+      .ascending('change_date');
+
+    let pageNum = 0;
+    const pageSize = 100;
+    let hasMoreData = true;
+    const recordsToDelete: string[] = [];
+
+    while (hasMoreData) {
+      const paginatedQuery = query.setPage(pageSize, pageNum);
+      const historyData = await col.fetch(paginatedQuery);
+
+      if (historyData.DATA && historyData.DATA.length > 0) {
+        // Check each record for predicted_ properties
+        (historyData.DATA as unknown as AssetHistoryRow[]).forEach((record: AssetHistoryRow) => {
+          if (record.changes && record.changes.custom_data) {
+            const customData = record.changes.custom_data;
+            const hasPredictedData = Object.keys(customData).some((key) => key.startsWith('predicted_'));
+
+            if (hasPredictedData && record.item_id) {
+              recordsToDelete.push(record.item_id);
+            }
+          }
+        });
+        pageNum++;
+      } else {
+        hasMoreData = false;
+      }
+    }
+    if (recordsToDelete.length > 0) {
+      const deleteBatchSize = 50;
+      for (let i = 0; i < recordsToDelete.length; i += deleteBatchSize) {
+        const batch = recordsToDelete.slice(i, i + deleteBatchSize);
+
+        try {
+          await Promise.all(
+            batch.map((itemId) =>
+              col.remove(ClearBladeAsync.Query().equalTo('item_id', itemId)).catch((error) => {
+                console.warn(`Failed to delete forecast record ${itemId} for asset ${assetId}:`, error);
+              }),
+            ),
+          );
+        } catch (error) {
+          console.error(`Batch delete failed for asset ${assetId}:`, error);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error clearing old forecast data for asset ${assetId}:`, error);
+  }
 };
 
 // rename the forecast file after adding to the asset history collection
