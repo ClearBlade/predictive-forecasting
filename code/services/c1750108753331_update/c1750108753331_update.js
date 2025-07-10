@@ -110,9 +110,9 @@ function c1750108753331_update(req, resp) {
     if (currentAttributesToPredict && Array.isArray(currentAttributesToPredict)) {
       currentAttributesToPredict.forEach(function (attribute) {
         var feature_name = attribute.attribute_name;
-        currentPredictedNames.push('predicted ' + feature_name);
-        currentPredictedNames.push('predicted ' + feature_name + ' upper bound');
-        currentPredictedNames.push('predicted ' + feature_name + ' lower bound');
+        currentPredictedNames.push('predicted_' + feature_name);
+        currentPredictedNames.push('predicted_' + feature_name + '_upper_bound');
+        currentPredictedNames.push('predicted_' + feature_name + '_lower_bound');
       });
     }
 
@@ -120,17 +120,17 @@ function c1750108753331_update(req, resp) {
     if (newAttributesToPredict && Array.isArray(newAttributesToPredict)) {
       newAttributesToPredict.forEach(function (attribute) {
         var feature_name = attribute.attribute_name;
-        newPredictedNames.push('predicted ' + feature_name);
-        newPredictedNames.push('predicted ' + feature_name + ' upper bound');
-        newPredictedNames.push('predicted ' + feature_name + ' lower bound');
+        newPredictedNames.push('predicted_' + feature_name);
+        newPredictedNames.push('predicted_' + feature_name + '_upper_bound');
+        newPredictedNames.push('predicted_' + feature_name + '_lower_bound');
       });
     }
 
     newAttributesToPredict.forEach(function (attribute) {
       var feature_name = attribute.attribute_name;
-      var predictedName = 'predicted ' + feature_name;
-      var upperName = 'predicted ' + feature_name + ' upper bound';
-      var lowerName = 'predicted ' + feature_name + ' lower bound';
+      var predictedName = 'predicted_' + feature_name;
+      var upperName = 'predicted_' + feature_name + '_upper_bound';
+      var lowerName = 'predicted_' + feature_name + '_lower_bound';
 
       var isCurrentlyPredicted = currentPredictedNames.includes(predictedName);
       
