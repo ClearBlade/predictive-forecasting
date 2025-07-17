@@ -219,147 +219,132 @@ function c1750108753331_update(req, resp) {
   }
 
   // First fetch the existing record to get current asset_management_data
-  col.fetch(query).then(function(data) {
-    if (data.DATA.length === 0) {
-      return resp.error('No existing forecast configuration found for asset_type_id: ' + params.entity_id);
-    }
-
-    const existingRecord = data.DATA[0];
-    const existingAssetData = existingRecord.asset_management_data || [];
-    const currentRetrainingFreq = existingRecord.retrain_frequency || 0;
-    const currentAttributesToPredict = existingRecord.attributes_to_predict || [];
-
-    const updateData = {
-      asset_type_id: params.entity_id,
-      latest_settings_update: currentTime,
-    };
-
-    var newRetrainingFreq = currentRetrainingFreq;
-    var newAttributesToPredict = currentAttributesToPredict;
-
-    if (payload) {
-      if (payload.forecast_refresh_rate) {
-        updateData.forecast_refresh_rate = payload.forecast_refresh_rate;
-      }
-      if (payload.retrain_frequency) {
-        newRetrainingFreq =
-          typeof payload.retrain_frequency === 'number' && payload.retrain_frequency > 0
-            ? payload.retrain_frequency
-            : 0;
-        updateData.retrain_frequency = newRetrainingFreq;
-      }
-      if (payload.forecast_length) {
-        updateData.forecast_length = payload.forecast_length;
-        updateData.timestep = Math.round((payload.forecast_length * 1440) / 672);
-      }
-      if (payload.attributes_to_predict && Array.isArray(payload.attributes_to_predict)) {
-        updateData.attributes_to_predict = payload.attributes_to_predict;
-        newAttributesToPredict = payload.attributes_to_predict;
-      }
-      if (payload.supporting_attributes && Array.isArray(payload.supporting_attributes)) {
-        updateData.supporting_attributes = payload.supporting_attributes;
-      }
-      if (payload.forecast_start_date) {
-        updateData.forecast_start_date = payload.forecast_start_date;
+  col.fetch(query).then(function (data) {
+      if (data.DATA.length === 0) {
+        return resp.error('No existing forecast configuration found for asset_type_id: ' + params.entity_id);
       }
 
-      if (payload.asset_management_data && Array.isArray(payload.asset_management_data)) {
-        var shouldUpdateInferenceTime = false;
-        var nextInferenceTime = currentTime;
-        var baseNextTrainTime = currentTime;
+      const existingRecord = data.DATA[0];
+      const existingAssetData = existingRecord.asset_management_data || [];
+      const currentRetrainingFreq = existingRecord.retrain_frequency || 0;
+      const currentAttributesToPredict = existingRecord.attributes_to_predict || [];
 
+      const updateData = {
+        asset_type_id: params.entity_id,
+        latest_settings_update: currentTime,
+      };
+
+      var newRetrainingFreq = currentRetrainingFreq;
+      var newAttributesToPredict = currentAttributesToPredict;
+
+      if (payload) {
+        if (payload.forecast_refresh_rate) {
+          updateData.forecast_refresh_rate = payload.forecast_refresh_rate;
+        }
+        if (payload.retrain_frequency) {
+          newRetrainingFreq =
+            typeof payload.retrain_frequency === 'number' && payload.retrain_frequency > 0
+              ? payload.retrain_frequency
+              : 0;
+          updateData.retrain_frequency = newRetrainingFreq;
+        }
+        if (payload.forecast_length) {
+          updateData.forecast_length = payload.forecast_length;
+          updateData.timestep = Math.round((payload.forecast_length * 1440) / 672);
+        }
+        if (payload.attributes_to_predict && Array.isArray(payload.attributes_to_predict)) {
+          updateData.attributes_to_predict = payload.attributes_to_predict;
+          newAttributesToPredict = payload.attributes_to_predict;
+        }
+        if (payload.supporting_attributes && Array.isArray(payload.supporting_attributes)) {
+          updateData.supporting_attributes = payload.supporting_attributes;
+        }
         if (payload.forecast_start_date) {
-          const forecastStartDate = new Date(payload.forecast_start_date);
-          const now = new Date();
-          
-          if (forecastStartDate > now) {
-            shouldUpdateInferenceTime = true;
-            nextInferenceTime = payload.forecast_start_date;
-            
-            const nextInferenceDate = new Date(nextInferenceTime);
-            const oneDayFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-            
-            if (nextInferenceDate < oneDayFromNow) {
-              baseNextTrainTime = currentTime;
-            } else {
-              const trainDate = new Date(nextInferenceDate.getTime() - 24 * 60 * 60 * 1000);
-              baseNextTrainTime = trainDate.toISOString();
-            }
-          }
+          updateData.forecast_start_date = payload.forecast_start_date;
         }
 
-        var existingAssetMap = {};
-        existingAssetData.forEach(function(existingAsset) {
-          if (existingAsset.id) {
-            existingAssetMap[existingAsset.id] = existingAsset;
-          }
-        });
-
-        var retrainingFreqChange = newRetrainingFreq - currentRetrainingFreq;
-
-        updateData.asset_management_data = payload.asset_management_data.map(function (asset) {
-          var existingAsset = existingAssetMap[asset.id];
-          
-          if (existingAsset) {
-            var preservedData = {
-              asset_model: existingAsset.asset_model,
-              last_inference_time: existingAsset.last_inference_time,
-              last_train_time: existingAsset.last_train_time,
-              next_inference_time: existingAsset.next_inference_time,
-              next_train_time: existingAsset.next_train_time,
-            };
-
-            if (shouldUpdateInferenceTime) {
-              preservedData.next_inference_time = nextInferenceTime;
+        if (payload.asset_management_data && Array.isArray(payload.asset_management_data)) {
+          var existingAssetMap = {};
+          existingAssetData.forEach(function (existingAsset) {
+            if (existingAsset.id) {
+              existingAssetMap[existingAsset.id] = existingAsset;
             }
+          });
 
-            if (retrainingFreqChange !== 0) {
-              if (currentRetrainingFreq === 0 && newRetrainingFreq > 0) {
-                if (existingAsset.last_train_time) {
-                  const lastTrainDate = new Date(existingAsset.last_train_time);
-                  const nextTrainDate = new Date(lastTrainDate.getTime() + (newRetrainingFreq * 24 * 60 * 60 * 1000));
-                  preservedData.next_train_time = nextTrainDate.toISOString();
-                } else {
-                  preservedData.next_train_time = baseNextTrainTime;
-                }
-              } else if (newRetrainingFreq > 0 && existingAsset.next_train_time) {
-                const currentNextTrainDate = new Date(existingAsset.next_train_time);
-                const adjustedTrainDate = new Date(currentNextTrainDate.getTime() + (retrainingFreqChange * 24 * 60 * 60 * 1000));
-                preservedData.next_train_time = adjustedTrainDate.toISOString();
+          updateData.asset_management_data = payload.asset_management_data.map(function (asset) {
+            var existingAsset = existingAssetMap[asset.id];
+
+            if (existingAsset) {
+              var preservedData = {
+                asset_model: existingAsset.asset_model,
+                last_inference_time: existingAsset.last_inference_time,
+                last_train_time: existingAsset.last_train_time,
+                next_inference_time: existingAsset.next_inference_time,
+                next_train_time: existingAsset.next_train_time,
+              };
+
+              if (existingAsset.last_inference_time && payload.forecast_refresh_rate) {
+                const lastInferenceDate = new Date(existingAsset.last_inference_time);
+                const nextInferenceDate = new Date(lastInferenceDate.getTime() + payload.forecast_refresh_rate * 24 * 60 * 60 * 1000);
+                preservedData.next_inference_time = nextInferenceDate.toISOString();
               }
+
+              if (payload.forecast_start_date && preservedData.next_inference_time) {
+                const forecastStartDate = new Date(payload.forecast_start_date);
+                const nextInferenceDate = new Date(preservedData.next_inference_time);
+
+                if (nextInferenceDate < forecastStartDate) {
+                  const tenMinutesBefore = new Date(forecastStartDate.getTime() - 10 * 60 * 1000);
+                  preservedData.next_inference_time = tenMinutesBefore.toISOString();
+                }
+              }
+
+              if (existingAsset.last_train_time && newRetrainingFreq > 0) {
+                const lastTrainDate = new Date(existingAsset.last_train_time);
+                const nextTrainDate = new Date(lastTrainDate.getTime() + newRetrainingFreq * 24 * 60 * 60 * 1000);
+                preservedData.next_train_time = nextTrainDate.toISOString();
+              }
+
+              if (payload.forecast_start_date) {
+                const forecastStartDate = new Date(payload.forecast_start_date);
+                const twoHoursBefore = new Date(forecastStartDate.getTime() - 2 * 60 * 60 * 1000);
+                preservedData.next_train_time = twoHoursBefore.toISOString();
+              }
+
+              if (!preservedData.next_train_time) {
+                preservedData.next_train_time = currentTime;
+              }
+
+              return Object.assign({}, asset, preservedData);
+            } else {
+              var newAssetData = {
+                asset_model: null,
+                last_inference_time: null,
+                last_train_time: null,
+                next_inference_time: null,
+                next_train_time: currentTime,
+              };
+
+              return Object.assign({}, asset, newAssetData);
             }
-
-            return Object.assign({}, asset, preservedData);
-          } else {
-            var newAssetData = {
-              asset_model: null,
-              last_inference_time: null,
-              last_train_time: null,
-              next_inference_time: nextInferenceTime,
-              next_train_time: baseNextTrainTime,
-            };
-
-            return Object.assign({}, asset, newAssetData);
-          }
-        });
+          });
+        }
       }
-    }
 
-    return col.update(query, updateData).then(function() {
-      var attributesChanged = JSON.stringify(currentAttributesToPredict) !== JSON.stringify(newAttributesToPredict);
-      
-      if (attributesChanged) {
-        return Promise.all([
-          getGroupsForAssetType(),
-          getAssetTypeInfo()
-        ]).then(function(results) {
-          var groups = results[0];
-          var assetTypeInfo = results[1];
-          return updateForecastAttributes(assetTypeInfo, groups, newAttributesToPredict, currentAttributesToPredict);
-        });
-      }
-      
-      return Promise.resolve();
-    });
-  }).then(resp.success).catch(resp.error);
+      return col.update(query, updateData).then(function () {
+        var attributesChanged = JSON.stringify(currentAttributesToPredict) !== JSON.stringify(newAttributesToPredict);
+
+        if (attributesChanged) {
+          return Promise.all([getGroupsForAssetType(), getAssetTypeInfo()]).then(function (results) {
+            var groups = results[0];
+            var assetTypeInfo = results[1];
+            return updateForecastAttributes(assetTypeInfo, groups, newAttributesToPredict, currentAttributesToPredict);
+          });
+        }
+
+        return Promise.resolve();
+      });
+    })
+    .then(resp.success)
+    .catch(resp.error);
 }
