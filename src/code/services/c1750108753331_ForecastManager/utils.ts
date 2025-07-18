@@ -1,5 +1,6 @@
 import { AssetHistory } from '@ia/common/collection-types/asset_history';
-import { Attributes } from '@ia/common/collection-types/components';
+import { AttrSchemaRt } from '@ia/common/misc/attributes';
+import { rt } from '@ia/common/lib/runtypes';
 
 const PROJECT_ID = 'clearblade-ipm';
 const DATASET_ID = 'predictive_forecasting';
@@ -15,12 +16,14 @@ const OUTPUT_DIRECTORY = 'gs://clearblade-predictive-forecasting';
 
 interface AssetManagementData {
   id: string; //the asset id that forecasting will be set up for
-  next_inference_time?: string; //the next time inference should be run
-  last_inference_time?: string; //the last time inference was run
-  next_train_time?: string; //the next time training should be run
-  last_train_time?: string; //the last time training was run
-  asset_model?: string; //the gsutil path to this asset's forecast model
+  next_inference_time?: string | null; //the next time inference should be run
+  last_inference_time?: string | null; //the last time inference was run
+  next_train_time?: string | null; //the next time training should be run
+  last_train_time?: string | null; //the last time training was run
+  asset_model?: string | null; //the gsutil path to this asset's forecast model
 }
+
+type Attributes = rt.Static<typeof AttrSchemaRt>;
 
 export interface PipelineData {
   asset_type_id: string; //the asset type id that forecasting will be set up for
@@ -463,9 +466,14 @@ export const updateBQAssetHistory = async (pipeline: PipelineData, assetId: stri
     const col = ClearBladeAsync.Collection('_asset_history');
     let query = ClearBladeAsync.Query().equalTo('asset_id', asset.id);
 
+    const currentTime = new Date();
+
     if (lastHistUpdate) {
       query = query.greaterThan('change_date', lastHistUpdate.toISOString());
     }
+
+    // Only get data up to current time to avoid including future forecast data
+    query = query.lessThan('change_date', currentTime.toISOString());
 
     query = query.ascending('change_date');
 
