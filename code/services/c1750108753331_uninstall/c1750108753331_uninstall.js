@@ -185,12 +185,19 @@ function c1750108753331_uninstall(req, resp) {
       log('No access token found, so not deleting BQ data');
       return Promise.resolve();
     }
-    return removeBQData(token.accessToken, entity_id);
-  }).then(function(){
-    return Promise.all([getAssetTypeInfo(), getGroupsForAssetType()]);
-  }).then(function(results){
-    const assetTypeInfo = results[0];
-    const groupIds = results[1];
-    return removeForecastAttributes(assetTypeInfo, groupIds);
-  }).then(resp.success).catch(resp.error);
+    return removeBQData(token.accessToken, entity_id).catch(function (error) {
+        console.error('Failed to remove BQ data, continuing with uninstall:', error);
+        return Promise.resolve();
+      });
+    })
+    .then(function () {
+      return Promise.all([getAssetTypeInfo(), getGroupsForAssetType()]);
+    })
+    .then(function (results) {
+      const assetTypeInfo = results[0];
+      const groupIds = results[1];
+      return removeForecastAttributes(assetTypeInfo, groupIds);
+    })
+    .then(resp.success)
+    .catch(resp.error);
 }
