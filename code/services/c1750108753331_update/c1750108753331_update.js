@@ -339,6 +339,27 @@ function c1750108753331_update(req, resp) {
             var groups = results[0];
             var assetTypeInfo = results[1];
             return updateForecastAttributes(assetTypeInfo, groups, newAttributesToPredict, currentAttributesToPredict);
+          }).then(function() {
+            const nextInferenceTime = payload.forecast_start_date || currentTime;
+            const nextInferenceDate = new Date(nextInferenceTime);
+            const oneDayFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            var nextTrainTime;
+            if (nextInferenceDate < oneDayFromNow) {
+              nextTrainTime = currentTime;
+            } else {
+              const trainDate = new Date(nextInferenceDate.getTime() - 24 * 60 * 60 * 1000);
+              nextTrainTime = trainDate.toISOString();
+            }
+            if (updateData.asset_management_data && Array.isArray(updateData.asset_management_data)) {
+              updateData.asset_management_data.forEach(function(asset) {
+                asset.asset_model = null;
+                asset.last_train_time = null;
+                asset.next_train_time = nextTrainTime;
+                asset.next_inference_time = nextInferenceTime;
+              });              
+              return col.update(query, { asset_management_data: updateData.asset_management_data });
+            }
+            return Promise.resolve();
           });
         }
 

@@ -13,9 +13,9 @@
  */
 
 function c1750108753331_uninstall(req, resp) {
-  const CACHE_KEY = 'google-bigquery-forecasting-config'
-  const PROJECT_ID = 'clearblade-ipm'
-  const DATASET_ID = 'predictive_forecasting'
+  const CACHE_KEY = 'google-bigquery-forecasting-config';
+  const PROJECT_ID = 'clearblade-ipm';
+  const DATASET_ID = 'predictive_forecasting';
 
   const params = req.params;
   const entity_id = params.entity_id;

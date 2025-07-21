@@ -13,10 +13,10 @@
  */
 
 function c1750108753331_setup(req, resp) {
-  const SECRET_KEY = 'gcp-bigquery-service-account'
-  const CACHE_KEY = 'google-bigquery-forecasting-config'
-  const PROJECT_ID = 'clearblade-ipm'
-  const DATASET_ID = 'predictive_forecasting'
+  const SECRET_KEY = 'gcp-bigquery-service-account';
+  const CACHE_KEY = 'google-bigquery-forecasting-config';
+  const PROJECT_ID = 'clearblade-ipm';
+  const DATASET_ID = 'predictive_forecasting';
   
   var mySecret = {}
 

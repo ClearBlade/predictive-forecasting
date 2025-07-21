@@ -13,7 +13,7 @@
  */
 
 function c1750108753331_teardown(req, resp) {
-  const CACHE_KEY = 'google-bigquery-forecasting-config'
+  const CACHE_KEY = 'google-bigquery-forecasting-config';
   
   Promise.all([
     removeSubscriptionRow(),
