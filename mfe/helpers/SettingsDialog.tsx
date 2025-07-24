@@ -51,7 +51,7 @@ const SettingsDialog = ({
           queryClient.invalidateQueries(["configuredComponents"]),
           queryClient.invalidateQueries(["componentEntities"]),
           queryClient.invalidateQueries(["componentSettings"]),
-          queryClient.invalidateQueries(["assetTypes"]),
+          // queryClient.invalidateQueries(["assetTypes"]),
         ]);
         setOpen(false);
         showSnackbar(`Successfully added attribute forecasting`, "success");
@@ -68,7 +68,7 @@ const SettingsDialog = ({
           queryClient.invalidateQueries(["configuredComponents"]),
           queryClient.invalidateQueries(["componentEntities"]),
           queryClient.invalidateQueries(["componentSettings"]),
-          queryClient.invalidateQueries(["assetTypes"]),
+          // queryClient.invalidateQueries(["assetTypes"]),
         ]);
         setOpen(false);
         showSnackbar(`Successfully updated attribute forecasting`, "success");
@@ -77,13 +77,6 @@ const SettingsDialog = ({
         showSnackbar(error.message, "error");
       },
     });
-
-  const { data: assetTypes, isLoading: isLoadingAssetTypes } =
-    useFetchAssetTypes();
-
-  if (!assetTypes) {
-    return null;
-  }
 
   return (
     <>
@@ -167,9 +160,7 @@ const SettingsDialog = ({
             }}
             color="primary"
             variant="contained"
-            disabled={
-              isCreatingComponent || isUpdatingComponent || isLoadingAssetTypes
-            }
+            disabled={isCreatingComponent || isUpdatingComponent}
           >
             {isCreatingComponent || isUpdatingComponent ? (
               <CircularProgress size={20} />

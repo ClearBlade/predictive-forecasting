@@ -32,6 +32,7 @@ import {
   getRecommendation,
 } from "../api/useGetRecommendation";
 import { useQueryClient } from "react-query";
+import { useFetchComponentSettings } from "../api/useFetchComponentSettings";
 
 const useStyles = makeStyles((theme) => ({
   disabledText: {
@@ -144,6 +145,9 @@ export default function ForecastingForm(
   const { data: assetTypes, isLoading: assetTypesLoading } =
     useFetchAssetTypes();
 
+  const { data: componentSettings, isLoading: componentSettingsLoading } =
+    useFetchComponentSettings(selectedAssetTypeId);
+
   // Use infinite query for assets with pagination
   const {
     data: assetsInfinite,
@@ -191,6 +195,19 @@ export default function ForecastingForm(
       () => getRecommendation(attributeNames)
     );
     return data;
+  };
+
+  const getUnconfiguredAssetTypes = () => {
+    if (assetTypes && componentSettings) {
+      return assetTypes.filter(
+        (assetType) =>
+          !componentSettings.some(
+            (componentSetting) =>
+              componentSetting.asset_type_id === assetType.id
+          )
+      );
+    }
+    return [];
   };
 
   return (
@@ -322,7 +339,7 @@ export default function ForecastingForm(
                       }}
                       variant="outlined"
                     >
-                      {assetTypes.map((option) => (
+                      {getUnconfiguredAssetTypes().map((option) => (
                         <MenuItem value={option.id} key={option.id}>
                           {option.label}
                         </MenuItem>

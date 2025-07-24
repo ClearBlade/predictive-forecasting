@@ -103,16 +103,8 @@ const ComponentEntityCard = ({
 
   const isExpanded = localOverride !== null ? localOverride : expandAll;
 
-  const {
-    data: componentSettings,
-    isLoading: componentSettingsLoading,
-    refetch: refetchComponentSettings,
-  } = useFetchComponentSettings(entity.id);
-  const {
-    data: assetTypeData,
-    isLoading: assetTypeDataLoading,
-    refetch: refetchAssetTypes,
-  } = useFetchAssetTypes(entity.id);
+  const { data: assetTypeData, isLoading: assetTypeDataLoading } =
+    useFetchAssetTypes(entity.id);
   const { mutate: deleteComponent, isLoading: isDeletingComponent } =
     useDeleteComponent({
       onSuccess: () => {
@@ -131,33 +123,12 @@ const ComponentEntityCard = ({
       },
     });
 
-  if (componentSettingsLoading || assetTypeDataLoading) {
+  if (assetTypeDataLoading) {
     return <CircularProgress />;
   }
 
-  if (
-    !componentSettings ||
-    !assetTypeData ||
-    componentSettings.length === 0 ||
-    assetTypeData.length === 0
-  ) {
-    if (retryCount < 3) {
-      setTimeout(() => {
-        refetchComponentSettings();
-        refetchAssetTypes();
-        setRetryCount((prev) => prev + 1);
-      }, 5000);
-      return (
-        <Typography variant="caption" color="textSecondary">
-          Waiting for component entities to be generated...
-        </Typography>
-      );
-    }
-    return (
-      <Typography variant="caption" color="textSecondary">
-        Error loading component entities. Try refreshing the page.
-      </Typography>
-    );
+  if (!assetTypeData || assetTypeData.length === 0) {
+    return null;
   }
 
   const getSelectedAttributes = () => {
@@ -169,12 +140,12 @@ const ComponentEntityCard = ({
       )
       .map((attribute) => ({
         ...attribute,
-        is_predicting: componentSettings[0].attributes_to_predict.find(
+        is_predicting: entity.entities.attributes_to_predict.find(
           (f) => f.attribute_name === attribute.attribute_name
         )
           ? true
           : false,
-        is_supporting: componentSettings[0].supporting_attributes.find(
+        is_supporting: entity.entities.supporting_attributes.find(
           (f) => f.attribute_name === attribute.attribute_name
         )
           ? true
@@ -337,7 +308,7 @@ const ComponentEntityCard = ({
           isEditing={isEditing}
           component={{
             ...component,
-            settings: componentSettings[0],
+            settings: entity.entities,
           }}
         />
       )}
