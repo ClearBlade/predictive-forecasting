@@ -17,13 +17,13 @@ import {
   getAssetModel,
   shouldRunTrainingPipeline,
   shouldRunInferencePipeline,
-  updateBQAssetHistory,
   startTrainingPipeline,
   startInferencePipeline,
   handleNewForecast,
   updatePipelineRows,
   PipelineData,
   isThresholdMet,
+  cleanupAssetModels,
 } from './utils';
 
 async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServer.Resp) {
@@ -32,6 +32,8 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
     const currentTimeISO = currentTime.toISOString();
     const pipelines: PipelineData[] = await getPipelines();
     const updatedPipelines: PipelineData[] = [];
+
+    await cleanupAssetModels(pipelines);
 
     for (const pipeline of pipelines) {
       let pipelineUpdated = false;
@@ -62,8 +64,6 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
             thresholdMet &&
             (pipeline.retrain_frequency > 0 || asset.last_train_time === null)
           ) {
-            console.log('Updating asset history!');
-            await updateBQAssetHistory(pipeline, asset.id);
             const trainResult = await startTrainingPipeline(pipeline, asset);
             asset.last_train_time = currentTimeISO;
             asset.next_train_time = new Date(currentTime.getTime() + 6 * 60 * 60 * 1000).toISOString();
@@ -84,7 +84,6 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
           // Step 3: Check if inference pipeline should run
           if (shouldRunInferencePipeline(asset)) {
             console.log('Initializing inference pipeline');
-            await updateBQAssetHistory(pipeline, asset.id);
             const inferenceResult = await startInferencePipeline(pipeline, asset);
             if (!inferenceResult.error) {
               asset.last_inference_time = currentTimeISO;

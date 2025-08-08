@@ -20,6 +20,7 @@ interface AssetManagementData {
   last_inference_time?: string | null; //the last time inference was run
   next_train_time?: string | null; //the next time training should be run
   last_train_time?: string | null; //the last time training was run
+  last_bq_sync_time?: string | null; //the last time the asset history was synced to BigQuery
   asset_model?: string | null; //the gsutil path to this asset's forecast model
 }
 
@@ -53,17 +54,6 @@ interface SubscriptionConfig {
   pullUrl: string;
   ackUrl: string;
   subscriptionType: string;
-}
-
-interface BQDataSchema {
-  date_time: string;
-  asset_type_id: string;
-  asset_id: string;
-  data: Record<string, number>;
-}
-
-interface BQRow {
-  json: { date_time: string; asset_type_id: string; asset_id: string; data: string };
 }
 
 interface ForecastData {
@@ -111,24 +101,52 @@ export const isThresholdMet = async (assetId: string, timeStep: number): Promise
   }
 };
 
-// if current time is greater than next_train_time, then return true, otherwise return false
+// if current time is greater than next_train_time and BigQuery sync is recent, then return true, otherwise return false
 export const shouldRunTrainingPipeline = (asset: AssetManagementData): boolean => {
   if (!asset.next_train_time) {
     return false;
   }
   const currentTime = new Date();
   const nextTrainTime = new Date(asset.next_train_time);
-  return currentTime > nextTrainTime;
+  if (currentTime <= nextTrainTime) {
+    return false;
+  }
+  if (asset.last_bq_sync_time) {
+    const lastSyncTime = new Date(asset.last_bq_sync_time);
+    const syncDeadline = new Date(nextTrainTime.getTime() - 30 * 60 * 1000); // 30 minutes before
+    if (lastSyncTime < syncDeadline) {
+      console.log(`Training delayed for asset ${asset.id}: BigQuery sync too old (${asset.last_bq_sync_time})`);
+      return false;
+    }
+  } else {
+    console.log(`Training delayed for asset ${asset.id}: No BigQuery sync recorded`);
+    return false;
+  }
+  return true;
 };
 
-// if current time is greater than next_inference_time and asset_model is not null, then return true, otherwise return false
+// if current time is greater than next_inference_time, asset_model is not null, and BigQuery sync is recent, then return true, otherwise return false
 export const shouldRunInferencePipeline = (asset: AssetManagementData): boolean => {
   if (!asset.next_inference_time || !asset.asset_model) {
     return false;
   }
   const currentTime = new Date();
   const nextInferenceTime = new Date(asset.next_inference_time);
-  return currentTime > nextInferenceTime;
+  if (currentTime <= nextInferenceTime) {
+    return false;
+  }
+  if (asset.last_bq_sync_time) {
+    const lastSyncTime = new Date(asset.last_bq_sync_time);
+    const syncDeadline = new Date(nextInferenceTime.getTime() - 15 * 60 * 1000); // 15 minutes before
+    if (lastSyncTime < syncDeadline) {
+      console.log(`Inference delayed for asset ${asset.id}: BigQuery sync too old (${asset.last_bq_sync_time})`);
+      return false;
+    }
+  } else {
+    console.log(`Inference delayed for asset ${asset.id}: No BigQuery sync recorded`);
+    return false;
+  }
+  return true;
 };
 
 // start the training pipeline
@@ -279,13 +297,22 @@ export const startInferencePipeline = async (
 
 //update the forecast_ml_pipelines collection
 export const updatePipelineRows = async (rows: PipelineData[]): Promise<void> => {
-  const col = ClearBladeAsync.Collection({
-    collectionName: 'forecast_ml_pipelines',
-  });
-  const promises = rows.map((row) => {
-    return col.update(ClearBladeAsync.Query().equalTo('asset_type_id', row.asset_type_id), row);
-  });
-  await Promise.all(promises);
+  // Use lock to prevent race condition with AssetHistoryMigrator
+  const lock = ClearBladeAsync.Lock('forecast_ml_pipelines_update', 'ForecastManager');
+
+  try {
+    await lock.lock();
+
+    const col = ClearBladeAsync.Collection({
+      collectionName: 'forecast_ml_pipelines',
+    });
+    const promises = rows.map((row) => {
+      return col.update(ClearBladeAsync.Query().equalTo('asset_type_id', row.asset_type_id), row);
+    });
+    await Promise.all(promises);
+  } finally {
+    await lock.unlock();
+  }
 };
 
 const cacheName = 'AccessTokenCache';
@@ -297,349 +324,6 @@ const AccessTokenCache = (asyncClient = ClearBladeAsync) => {
     getAll: () => cache.getAll(),
     set: (subscriptionID: string, data: SubscriptionConfig) => cache.set(subscriptionID, data),
   };
-};
-
-// bulk insert data into BigQuery
-const addBulkDataToBQ = async (dataArray: BQDataSchema[]): Promise<BQDataSchema[]> => {
-  if (dataArray.length === 0) {
-    return dataArray;
-  }
-
-  try {
-    const allSubscriptions = await AccessTokenCache()
-      .getAll()
-      .catch((err) => Promise.reject({ error: true, message: err }));
-    const bigQueryToken = allSubscriptions['google-bigquery-forecasting-config'].accessToken;
-
-    if (!bigQueryToken) {
-      throw new Error(
-        "BigQuery Token is undefined or empty. Please check the subscription 'google-bigquery-forecasting-config'.",
-      );
-    }
-
-    //Estimate size of first row to determine batch size
-    const firstRowBQ: BQRow = {
-      json: {
-        date_time: dataArray[0].date_time,
-        asset_type_id: dataArray[0].asset_type_id,
-        asset_id: dataArray[0].asset_id,
-        data: JSON.stringify(dataArray[0].data),
-      },
-    };
-
-    const firstRowSizeBytes = JSON.stringify(firstRowBQ).length;
-    const firstRowSizeKB = Math.ceil(firstRowSizeBytes / 100) / 10; // Round up to nearest 0.1 KB
-
-    //Calculate how many rows fit in ~500KB batches
-    const targetBatchSizeKB = 500;
-    const rowsPerBatch = Math.floor(targetBatchSizeKB / firstRowSizeKB);
-    const actualRowsPerBatch = Math.max(1, rowsPerBatch); // Ensure at least 1 row per batch
-
-    //Create batches
-    const batches: BQDataSchema[][] = [];
-    for (let i = 0; i < dataArray.length; i += actualRowsPerBatch) {
-      batches.push(dataArray.slice(i, i + actualRowsPerBatch));
-    }
-
-    //Retries a batch up to 3 times if it fails
-    const processBatchWithRetry = async (
-      batch: BQDataSchema[],
-      batchIndex: number,
-      maxRetries = 3,
-    ): Promise<boolean> => {
-      const rows: BQRow[] = batch.map((data) => ({
-        json: {
-          date_time: data.date_time,
-          asset_type_id: data.asset_type_id,
-          asset_id: data.asset_id,
-          data: JSON.stringify(data.data),
-        },
-      }));
-
-      const insertAllPayload = {
-        rows: rows,
-      };
-
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          const insertResponse = await fetch(
-            `https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT_ID}/datasets/${DATASET_ID}/tables/${TABLE_ID}/insertAll`,
-            {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${bigQueryToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(insertAllPayload),
-            },
-          );
-
-          if (!insertResponse.ok) {
-            const errorText = await insertResponse.text();
-            throw new Error(`Error in BigQuery insertAll (batch ${batchIndex + 1}, attempt ${attempt}): ${errorText}`);
-          }
-
-          const insertResult = (await insertResponse.json()) as { insertErrors: string[] };
-
-          // Check for insert errors in the response
-          if (insertResult.insertErrors && insertResult.insertErrors.length > 0) {
-            console.warn(`Insert errors in batch ${batchIndex + 1}, attempt ${attempt}:`, insertResult.insertErrors);
-            // Continue processing - these are row-level errors, not batch failures
-          }
-
-          return true; // Success
-        } catch (error) {
-          const isFirstBatch = batchIndex === 0;
-          const isLastAttempt = attempt === maxRetries;
-
-          if (isFirstBatch) {
-            // If first batch fails, throw error immediately (don't retry)
-            throw error;
-          }
-
-          if (isLastAttempt) {
-            console.error(`Batch ${batchIndex + 1} failed after ${maxRetries} attempts:`, error);
-            return false; // Failed
-          } else {
-            // Log retry attempt
-            console.warn(`Batch ${batchIndex + 1} failed on attempt ${attempt}, retrying...`, error);
-            // Add a small delay before retrying
-            await new Promise((resolve) => setTimeout(resolve, 800 * attempt)); // Exponential backoff
-          }
-        }
-      }
-
-      return false;
-    };
-
-    let failedBatches = 0;
-
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-      const batch = batches[batchIndex];
-      const success = await processBatchWithRetry(batch, batchIndex);
-
-      if (!success) {
-        failedBatches++;
-      }
-    }
-
-    if (failedBatches > 0) {
-      console.warn(`${failedBatches} batches failed after retries, but processing continued`);
-    }
-
-    return dataArray;
-  } catch (reason) {
-    throw new Error(`Failed to bulk insert data into BQ: ${getErrorMessage(reason)}`);
-  }
-};
-
-function getErrorMessage(error: unknown): string {
-  if (typeof error === 'string') return error;
-  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
-    return error.message;
-  }
-  return JSON.stringify(error);
-}
-
-// update the the bigquery table with the latest asset history data for asset
-export const updateBQAssetHistory = async (pipeline: PipelineData, assetId: string) => {
-  try {
-    const asset = pipeline.asset_management_data.find((a) => a.id === assetId);
-    if (!asset) {
-      throw new Error(`Asset with id ${assetId} not found in pipeline data`);
-    }
-
-    let lastHistUpdate: Date | null = null;
-
-    if (asset.last_inference_time) {
-      const lastInferenceDate = new Date(asset.last_inference_time);
-      lastHistUpdate = lastInferenceDate;
-    }
-
-    if (asset.last_train_time) {
-      const lastTrainDate = new Date(asset.last_train_time);
-      if (!lastHistUpdate || lastTrainDate > lastHistUpdate) {
-        lastHistUpdate = lastTrainDate;
-      }
-    }
-
-    const col = ClearBladeAsync.Collection('_asset_history');
-    let query = ClearBladeAsync.Query().equalTo('asset_id', asset.id);
-
-    const currentTime = new Date();
-
-    if (lastHistUpdate) {
-      query = query.greaterThan('change_date', lastHistUpdate.toISOString());
-    }
-
-    // Only get data up to current time to avoid including future forecast data
-    query = query.lessThan('change_date', currentTime.toISOString());
-
-    query = query.ascending('change_date');
-
-    let histRows: AssetHistoryRow[] = [];
-    let pageNum = 0;
-    const pageSize = 100;
-    let hasMoreData = true;
-    while (hasMoreData) {
-      const paginatedQuery = query.setPage(pageSize, pageNum);
-      const historyData = await col.fetch(paginatedQuery);
-      if (historyData.DATA && historyData.DATA.length > 0) {
-        histRows = histRows.concat(historyData.DATA as unknown as AssetHistoryRow[]);
-        pageNum++;
-      } else {
-        hasMoreData = false;
-      }
-    }
-
-    if (histRows.length === 0) {
-      return;
-    }
-
-    const attributeConfig: Record<string, { type: string; resampleMethod: string }> = {};
-
-    pipeline.attributes_to_predict.forEach((attr) => {
-      attributeConfig[attr.attribute_name] = {
-        type: attr.attribute_type,
-        resampleMethod: attr.attribute_type === 'boolean' ? 'mode' : 'mean',
-      };
-    });
-
-    pipeline.supporting_attributes.forEach((attr) => {
-      attributeConfig[attr.attribute_name] = {
-        type: attr.attribute_type,
-        resampleMethod: attr.attribute_type === 'boolean' ? 'mode' : 'mean',
-      };
-    });
-
-    histRows = processAndResampleData(histRows, pipeline.timestep, attributeConfig);
-
-    const bqData: BQDataSchema[] = histRows.map((histRow) => ({
-      date_time: histRow.change_date,
-      asset_type_id: pipeline.asset_type_id,
-      asset_id: histRow.asset_id,
-      data: histRow.changes.custom_data as Record<string, number>,
-    }));
-
-    await addBulkDataToBQ(bqData);
-  } catch (error) {
-    console.error(`Error in updateBQAssetHistory for asset ${assetId}:`, error);
-    throw error;
-  }
-};
-
-export const processAndResampleData = (
-  data: AssetHistoryRow[],
-  timestepMinutes: number,
-  attributeConfig: Record<string, { type: string; resampleMethod: string }>,
-): AssetHistoryRow[] => {
-  if (data.length === 0) {
-    return data;
-  }
-
-  const sortedData = [...data].sort((a, b) => new Date(a.change_date).getTime() - new Date(b.change_date).getTime());
-
-  const assetId = sortedData[0].asset_id;
-  const startTime = new Date(sortedData[0].change_date);
-  const endTime = new Date(sortedData[sortedData.length - 1].change_date);
-
-  // Align start time to timestep boundary
-  const alignedStartMinute = Math.floor(startTime.getMinutes() / timestepMinutes) * timestepMinutes;
-  startTime.setMinutes(alignedStartMinute, 0, 0);
-
-  const resampledData: AssetHistoryRow[] = [];
-  let currentTime = new Date(startTime);
-  let dataIndex = 0;
-
-  const lastKnownValues: Record<string, number> = {};
-
-  while (currentTime <= endTime) {
-    const intervalEnd = new Date(currentTime.getTime() + timestepMinutes * 60 * 1000);
-
-    // Collect all data points in this interval
-    const intervalValues: Record<string, number[]> = {};
-    Object.keys(attributeConfig).forEach((attr) => {
-      intervalValues[attr] = [];
-    });
-
-    // Advance through sorted data to find points in current interval
-    while (dataIndex < sortedData.length) {
-      const dataPoint = sortedData[dataIndex];
-      const dataTime = new Date(dataPoint.change_date);
-
-      if (dataTime >= intervalEnd) {
-        break; // This point belongs to a future interval
-      }
-
-      // Process data point - convert booleans and filter attributes
-      Object.keys(dataPoint.changes.custom_data).forEach((attr) => {
-        if (attributeConfig[attr]) {
-          let value = dataPoint.changes.custom_data[attr];
-          if (typeof value === 'boolean') {
-            value = value ? 1 : 0;
-          } else if (typeof value === 'string') {
-            // Convert string numbers to actual numbers
-            value = parseFloat(value);
-            if (isNaN(value)) {
-              console.warn(`Invalid numeric value for ${attr}: ${dataPoint.changes.custom_data[attr]}`);
-              return; // Skip this attribute
-            }
-          }
-
-          // Update last known value
-          lastKnownValues[attr] = value as number;
-
-          // Add to interval if within time range
-          if (dataTime >= currentTime) {
-            intervalValues[attr].push(value as number);
-          }
-        }
-      });
-
-      dataIndex++;
-    }
-
-    while (dataIndex > 0 && new Date(sortedData[dataIndex - 1].change_date) >= currentTime) {
-      dataIndex--;
-    }
-
-    const aggregatedData: Record<string, number> = {};
-
-    Object.keys(attributeConfig).forEach((attr) => {
-      const values = intervalValues[attr];
-      const config = attributeConfig[attr];
-
-      if (values.length > 0) {
-        if (config.resampleMethod === 'mean') {
-          aggregatedData[attr] = values.reduce((sum, val) => sum + val, 0) / values.length;
-        } else if (config.resampleMethod === 'mode') {
-          const counts: Record<number, number> = {};
-          values.forEach((val) => {
-            counts[val] = (counts[val] || 0) + 1;
-          });
-          aggregatedData[attr] = Number(
-            Object.keys(counts).reduce((a, b) => (counts[Number(a)] > counts[Number(b)] ? a : b)),
-          );
-        }
-      } else if (lastKnownValues[attr] !== undefined) {
-        // fill with last known value if no data is available
-        aggregatedData[attr] = lastKnownValues[attr];
-      }
-    });
-
-    // Only add row if we have data for at least one attribute
-    if (Object.keys(aggregatedData).length > 0) {
-      resampledData.push({
-        asset_id: assetId,
-        change_date: currentTime.toISOString(),
-        changes: { custom_data: aggregatedData },
-      });
-    }
-
-    currentTime = new Date(intervalEnd);
-  }
-
-  return resampledData;
 };
 
 // fetch the asset model gsutil path from the file system
@@ -1102,4 +786,65 @@ const alignStartTime = (
   });
 
   return alignedForecastData;
+};
+
+// Clean up asset model folders for assets that have been uninstalled or updated to use different features
+export const cleanupAssetModels = async (pipelines: PipelineData[]): Promise<void> => {
+  try {
+    const trainedAssets: string[] = [];
+    pipelines.forEach((pipeline) => {
+      pipeline.asset_management_data.forEach((asset) => {
+        if (asset.last_train_time) {
+          trainedAssets.push(asset.id);
+        }
+      });
+    });
+
+    const fs = ClearBladeAsync.FS('ia-forecasting');
+    const outboxPath = 'outbox';
+
+    try {
+      const outboxContents = await fs.readDir(outboxPath);
+      const topLevelItems: Record<string, string[]> = {};
+
+      for (const itemPath of outboxContents) {
+        const pathParts = itemPath.replace('/outbox/', '').split('/');
+        const topLevelName = pathParts[0];
+        if (!topLevelName) continue;
+        if (!topLevelItems[topLevelName]) {
+          topLevelItems[topLevelName] = [];
+        }
+        topLevelItems[topLevelName].push(itemPath);
+      }
+
+      for (const [topLevelName, paths] of Object.entries(topLevelItems)) {
+        if (!trainedAssets.includes(topLevelName)) {
+          if (paths.length > 1) {
+            for (const filePath of paths) {
+              try {
+                await fs.deleteFile(filePath);
+                console.log(`Deleted: ${filePath}`);
+              } catch (error) {
+                console.warn(`Failed to delete ${filePath}:`, error);
+              }
+            }
+          } else if (paths.length === 1) {
+            const slashCount = (paths[0].match(/\//g) || []).length;
+            if (slashCount >= 3) {
+              try {
+                await fs.deleteFile(paths[0]);
+                console.log(`Deleted: ${paths[0]}`);
+              } catch (error) {
+                console.warn(`Failed to delete ${paths[0]}:`, error);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to read outbox directory:', error);
+    }
+  } catch (error) {
+    console.error('Error in cleanupAssetModels:', error);
+  }
 };
