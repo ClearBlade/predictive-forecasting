@@ -217,52 +217,49 @@ function c1750108753331_setup(req, resp) {
   }
 
   function createBQConnectCollection(secret) {
-    return fetch('https://' + cbmeta.platform_url + '/api/v/3/collectionmanagement', {
-      method: 'POST',
-      headers: {
-        'ClearBlade-DevToken': req.userToken,
-        'ClearBlade-SystemKey': cbmeta.system_key,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        appid: cbmeta.system_key,
-        dbtype: 'bigquery',
-        is_hypertable: true,
-        dbname: 'asset_history_migration',
-        name: 'bq_asset_history',
-        tablename: PROJECT_ID + '.' + DATASET_ID + '.' + cbmeta.system_key + '_forecast',
-        authentication_type: 'json',
-        project_id: PROJECT_ID,
-        credentials: JSON.stringify(secret),
-      }),
-    }).then(function(response) {
-      if (response.ok) {
-        return response.json().then(function(result) {
-          return result.collectionID;
-        });
-      }
-      
-      return handleBQCollectionError(response);
-    }).catch(function(fetchError) {
-      throw fetchError;
-    });
-  }
-
-  function handleBQCollectionError(response) {
-    return response.text().then(function(textContent) {
-      var errorData;
-      try {
-        errorData = JSON.parse(textContent);
-      } catch (parseError) {
-        throw new Error('Failed to create BQ connect collection (unparseable response): ' + textContent);
-      }
-      
-      if (errorData && errorData.error && errorData.error.message && errorData.error.message.indexOf('already exists') !== -1) {
+    try {
+      return fetch('https://' + cbmeta.platform_url + '/api/v/3/collectionmanagement', {
+        method: 'POST',
+        headers: {
+          'ClearBlade-DevToken': req.userToken,
+          'ClearBlade-SystemKey': cbmeta.system_key,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          appid: cbmeta.system_key,
+          dbtype: 'bigquery',
+          is_hypertable: true,
+          dbname: 'asset_history_migration',
+          name: 'bq_asset_history',
+          tablename: PROJECT_ID + '.' + DATASET_ID + '.' + cbmeta.system_key + '_forecast',
+          authentication_type: 'json',
+          project_id: PROJECT_ID,
+          credentials: JSON.stringify(secret),
+        }),
+      }).then(function(response) {
+        if (response.ok) {
+          return response.json().then(function(result) {
+            return result.collectionID;
+          });
+        }
+        
+        var textContent = response.text();
+        if (textContent.indexOf('A collection with that name already exists') !== -1) {
+          return getBQConnectCollectionId();
+        }
+        throw new Error('Failed to create BQ connect collection: ' + textContent);
+      }).catch(function(fetchError) {
+        throw fetchError;
+      });
+    } catch (error) {
+      // Handle case where fetch returns error object directly
+      log('2')
+      var errorString = JSON.stringify(error);
+      if (errorString.indexOf('A collection with that name already exists') !== -1) {
         return getBQConnectCollectionId();
       }
-      
-      throw new Error('Failed to create BQ connect collection: ' + JSON.stringify(errorData));
-    });
+      return Promise.reject('Failed to create BQ connect collection: ' + errorString);
+    }
   }
 
   function getBQConnectCollectionId() {
