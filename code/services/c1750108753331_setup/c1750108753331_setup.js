@@ -212,7 +212,7 @@ function c1750108753331_setup(req, resp) {
       return Promise.all([createBatchConnector(), createCollectionConnector(collectionId)]);
     }).catch(function(error) {
       log('MQTT connector setup failed:', error);
-      return Promise.resolve('MQTT connectors skipped - may need manual setup');
+      return Promise.reject("MQTT connector setup failed: " + error);
     });
   }
 
@@ -227,7 +227,7 @@ function c1750108753331_setup(req, resp) {
       body: JSON.stringify({
         appid: cbmeta.system_key,
         dbtype: 'bigquery',
-        is_hypertable: false,
+        is_hypertable: true,
         dbname: 'asset_history_migration',
         name: 'bq_asset_history',
         tablename: PROJECT_ID + '.' + DATASET_ID + '.' + cbmeta.system_key + '_forecast',
@@ -240,41 +240,28 @@ function c1750108753331_setup(req, resp) {
         return response.json().then(function(result) {
           return result.collectionID;
         });
-      } else {
-        var responseText = response.text();
-        
-        if (typeof responseText === 'string') {
-          var errorData;
-          try {
-            errorData = JSON.parse(responseText);
-          } catch (parseError) {
-            throw new Error('Failed to create BQ connect collection (unparseable response): ' + responseText);
-          }
-          
-          if (errorData && errorData.error && errorData.error.message && errorData.error.message.indexOf('already exists') !== -1) {
-            return getBQConnectCollectionId();
-          }
-          throw new Error('Failed to create BQ connect collection: ' + JSON.stringify(errorData));
-        } else {
-          return responseText.then(function(textContent) {
-            var errorData;
-            try {
-              errorData = JSON.parse(textContent);
-            } catch (parseError) {
-              throw new Error('Failed to create BQ connect collection (unparseable response): ' + textContent);
-            }
-            
-            if (errorData && errorData.error && errorData.error.message && errorData.error.message.indexOf('already exists') !== -1) {
-              return getBQConnectCollectionId();
-            }
-            throw new Error('Failed to create BQ connect collection: ' + JSON.stringify(errorData));
-          }).catch(function(textError) {
-            throw new Error('Failed to create BQ connect collection (response read error): ' + textError.message);
-          });
-        }
       }
+      
+      return handleBQCollectionError(response);
     }).catch(function(fetchError) {
       throw fetchError;
+    });
+  }
+
+  function handleBQCollectionError(response) {
+    return response.text().then(function(textContent) {
+      var errorData;
+      try {
+        errorData = JSON.parse(textContent);
+      } catch (parseError) {
+        throw new Error('Failed to create BQ connect collection (unparseable response): ' + textContent);
+      }
+      
+      if (errorData && errorData.error && errorData.error.message && errorData.error.message.indexOf('already exists') !== -1) {
+        return getBQConnectCollectionId();
+      }
+      
+      throw new Error('Failed to create BQ connect collection: ' + JSON.stringify(errorData));
     });
   }
 

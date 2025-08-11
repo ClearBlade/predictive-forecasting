@@ -18,43 +18,50 @@ import {
   getAllAssetIds,
   migrateAssetHistoryBatch,
   updateSyncTimesInPipelines,
+} from "./utils";
+import {
+  TIMER_TOPIC,
+  MAX_RUNTIME_MINUTES,
+  BATCH_SIZE,
+  SLEEP_BETWEEN_BATCHES_MS,
   PipelineData,
   AssetInfo,
   LocalSyncTracker,
-} from './utils';
+} from "./types";
 
-const TIMER_TOPIC = '$timer/c1750108753331_AssetHistoryMigrator_Timer';
-const MAX_RUNTIME_MINUTES = 15; // 15 minutes max per cycle with 5-minute timer intervals
-const BATCH_SIZE = 1000;
-const SLEEP_BETWEEN_BATCHES_MS = 50;
-
-function c1750108753331_AssetHistoryMigrator(_: CbServer.BasicReq, resp: CbServer.Resp) {
-  console.log('Starting AssetHistoryMigrator stream service');
+function c1750108753331_AssetHistoryMigrator(
+  _: CbServer.BasicReq,
+  resp: CbServer.Resp,
+) {
+  console.log("Starting AssetHistoryMigrator stream service");
 
   const client = new MQTT.Client();
   let isProcessing = false; // Prevent overlapping cycles
 
   client
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    .subscribe(TIMER_TOPIC, async function (_topic: string, _message: CbServer.MQTTMessage) {
-      // Prevent overlapping processing cycles
-      if (isProcessing) {
-        return;
-      }
+    .subscribe(
+      TIMER_TOPIC,
+      async function (_topic: string, _message: CbServer.MQTTMessage) {
+        // Prevent overlapping processing cycles
+        if (isProcessing) {
+          return;
+        }
 
-      isProcessing = true;
+        isProcessing = true;
 
-      try {
-        await runMigrationCycle();
-      } catch (error) {
-        console.error('Error in migration cycle:', error);
-      } finally {
-        isProcessing = false;
-      }
-    })
+        try {
+          await runMigrationCycle();
+        } catch (error) {
+          console.error("Error in migration cycle:", error);
+        } finally {
+          isProcessing = false;
+        }
+      },
+    )
     .catch(function (reason) {
-      console.error('Failed to subscribe to timer topic:', reason);
-      resp.error('Failed to subscribe to timer topic: ' + reason.message);
+      console.error("Failed to subscribe to timer topic:", reason);
+      resp.error("Failed to subscribe to timer topic: " + reason.message);
     });
 }
 
@@ -75,22 +82,30 @@ async function runMigrationCycle(): Promise<void> {
       if (!a.last_bq_sync_time && !b.last_bq_sync_time) return 0;
       if (!a.last_bq_sync_time) return 1; // New assets go last
       if (!b.last_bq_sync_time) return -1;
-      return new Date(b.last_bq_sync_time).getTime() - new Date(a.last_bq_sync_time).getTime();
+      return (
+        new Date(b.last_bq_sync_time).getTime() -
+        new Date(a.last_bq_sync_time).getTime()
+      );
     });
 
     // Process each asset with 15-minute timeout
     for (const assetInfo of allAssetIds) {
       const currentTime = new Date();
-      const runtimeMinutes = (currentTime.getTime() - startTime.getTime()) / (1000 * 60);
+      const runtimeMinutes =
+        (currentTime.getTime() - startTime.getTime()) / (1000 * 60);
 
       // Check if we're approaching the 15-minute limit
       if (runtimeMinutes >= MAX_RUNTIME_MINUTES) {
-        console.log(`Reached ${MAX_RUNTIME_MINUTES} minute limit, stopping processing, will resume next cycle`);
+        console.log(
+          `Reached ${MAX_RUNTIME_MINUTES} minute limit, stopping processing, will resume next cycle`,
+        );
         break;
       }
 
       try {
-        const pipeline = pipelines.find((p) => p.asset_type_id === assetInfo.pipelineId);
+        const pipeline = pipelines.find(
+          (p) => p.asset_type_id === assetInfo.pipelineId,
+        );
         if (!pipeline) {
           console.warn(`Pipeline not found for asset ${assetInfo.assetId}`);
           continue;
@@ -114,20 +129,24 @@ async function runMigrationCycle(): Promise<void> {
     // Cleanup: Update sync times in forecast_ml_pipelines collection
     await updateSyncTimesInPipelines(localSyncTracker);
   } catch (error) {
-    console.error('Error in migration cycle:', error);
+    console.error("Error in migration cycle:", error);
 
     // Attempt to save sync times even if there was an error
     try {
       if (Object.keys(localSyncTracker).length > 0) {
-        console.log('Attempting to save sync times despite error...');
+        console.log("Attempting to save sync times despite error...");
         await updateSyncTimesInPipelines(localSyncTracker);
       }
     } catch (saveError) {
-      console.error('Failed to save sync times during error cleanup:', saveError);
+      console.error(
+        "Failed to save sync times during error cleanup:",
+        saveError,
+      );
     }
   }
 }
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-global.c1750108753331_AssetHistoryMigrator = c1750108753331_AssetHistoryMigrator;
+global.c1750108753331_AssetHistoryMigrator =
+  c1750108753331_AssetHistoryMigrator;

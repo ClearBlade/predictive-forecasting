@@ -1,97 +1,18 @@
-import { AttrSchemaRt } from '@ia/common/misc/attributes';
-import { rt } from '@ia/common/lib/runtypes';
-
-type Attributes = rt.Static<typeof AttrSchemaRt>;
-
-interface MQTTClientOptions {
-  address: string;
-  port: number;
-  username: string;
-  password: string;
-  client_id: string;
-  use_tls: boolean;
-  tls_config: TLSConfig;
-}
-
-interface TLSConfig {
-  client_cert: string;
-  client_key: string;
-  ca_cert: string;
-}
-
-interface MQTTMessage {
-  payload: string;
-  qos: number;
-  retain: boolean;
-  duplicate: boolean;
-  user_properties?: Record<string, string>;
-}
-
-interface MQTTClientConstructor {
-  new (options?: MQTTClientOptions): MQTTClient;
-}
-
-interface MQTTClient {
-  disconnect: () => Promise<void>;
-  subscribe(topic: string, onMessage: (topic: string, message: MQTTMessage) => void): Promise<unknown>;
-  publish(topic: string, payload: string | MQTTMessage | Uint8Array, qos?: number, retain?: boolean): Promise<unknown>;
-}
-
-interface MQTTGlobal {
-  Client: MQTTClientConstructor;
-  Message: {
-    new (payload: string): MQTTMessage;
-    (payload: string): MQTTMessage;
-  };
-}
+import {
+  MQTTClient,
+  MQTTGlobal,
+  PipelineData,
+  AssetHistoryRow,
+  AssetInfo,
+  LocalSyncTracker,
+} from "./types";
 
 declare const MQTT: MQTTGlobal;
-
-interface AssetManagementData {
-  id: string; // the asset id that forecasting will be set up for
-  next_inference_time?: string | null; // the next time inference should be run
-  last_inference_time?: string | null; // the last time inference was run
-  next_train_time?: string | null; // the next time training should be run
-  last_train_time?: string | null; // the last time training was run
-  asset_model?: string | null; // the gsutil path to this asset's forecast model
-  last_bq_sync_time?: string | null; // the last time data was synced to BigQuery
-}
-
-export interface PipelineData {
-  asset_type_id: string; // the asset type id that forecasting will be set up for
-  attributes_to_predict: Attributes[]; // list of attributes that will receive forecasts and are used as features in the model
-  supporting_attributes: Attributes[]; // list of attributes that used as features in the model but do not receive forecasts
-  asset_management_data: AssetManagementData[]; // list of assets that will receive forecasts
-  forecast_refresh_rate: number; // how often inference should be run to generate forecasts
-  retrain_frequency: number; // how often training should be run to update the model
-  forecast_length: number; // the duration of the forecast in days
-  timestep: number; // the time step of the data in minutes
-  forecast_start_date: string; // the date when inference should first start
-  latest_settings_update: string; // the last time these settings were updated
-}
-
-interface AssetHistoryRow {
-  item_id?: string;
-  asset_id: string;
-  change_date: string;
-  changes: { custom_data: Record<string, number | boolean> };
-}
-
-export interface AssetInfo {
-  assetId: string;
-  pipelineId: string;
-  last_bq_sync_time?: string | null;
-}
-
-// Local tracking of sync times during migration
-export interface LocalSyncTracker {
-  [assetId: string]: string; // assetId -> last sync timestamp
-}
 
 // Get all forecast pipelines
 export const getPipelines = async (): Promise<PipelineData[]> => {
   const col = ClearBladeAsync.Collection<PipelineData>({
-    collectionName: 'forecast_ml_pipelines',
+    collectionName: "forecast_ml_pipelines",
   });
   const data = await col.fetch(ClearBladeAsync.Query());
   if (data.TOTAL === 0) return [];
@@ -116,7 +37,11 @@ export const getAllAssetIds = (pipelines: PipelineData[]): AssetInfo[] => {
 };
 
 // Create optimized query that filters rows at database level using JSONB operations
-const createOptimizedQuery = (assetInfo: AssetInfo, pipeline: PipelineData, currentTime: Date) => {
+const createOptimizedQuery = (
+  assetInfo: AssetInfo,
+  pipeline: PipelineData,
+  currentTime: Date,
+) => {
   const forecastAttributes = getForecastAttributes(pipeline);
   const attributeNames = Array.from(forecastAttributes);
 
@@ -129,7 +54,7 @@ const createOptimizedQuery = (assetInfo: AssetInfo, pipeline: PipelineData, curr
   baseConditions += ` AND change_date < '${currentTime.toISOString()}'`;
 
   if (attributeNames.length > 0) {
-    const attributeArray = `ARRAY[${attributeNames.map((name) => `'${name}'`).join(', ')}]`;
+    const attributeArray = `ARRAY[${attributeNames.map((name) => `'${name}'`).join(", ")}]`;
     baseConditions += ` AND changes->'custom_data' ?| ${attributeArray}`;
 
     baseConditions += ` AND NOT EXISTS (
@@ -150,8 +75,12 @@ const createOptimizedQuery = (assetInfo: AssetInfo, pipeline: PipelineData, curr
 // Get set of all forecast and supporting attribute names for a pipeline
 const getForecastAttributes = (pipeline: PipelineData): Set<string> => {
   const forecastAttributes = new Set<string>();
-  pipeline.attributes_to_predict.forEach((attr) => forecastAttributes.add(attr.attribute_name));
-  pipeline.supporting_attributes.forEach((attr) => forecastAttributes.add(attr.attribute_name));
+  pipeline.attributes_to_predict.forEach((attr) =>
+    forecastAttributes.add(attr.attribute_name),
+  );
+  pipeline.supporting_attributes.forEach((attr) =>
+    forecastAttributes.add(attr.attribute_name),
+  );
   return forecastAttributes;
 };
 
@@ -169,10 +98,13 @@ const publishBatchToMQTT = async (
     const forecastAttributes = getForecastAttributes(pipeline);
 
     for (const histRow of histRows) {
-      const topic = 'asset-history/raw';
+      const topic = "asset-history/raw";
 
       // Filter custom_data to only include forecast/supporting attributes and exclude predicted_ attributes
-      const filteredCustomData = filterRelevantAttributes(histRow.changes.custom_data, forecastAttributes);
+      const filteredCustomData = filterRelevantAttributes(
+        histRow.changes.custom_data,
+        forecastAttributes,
+      );
 
       // Skip if no relevant data post-filter
       if (Object.keys(filteredCustomData).length === 0) {
@@ -186,9 +118,9 @@ const publishBatchToMQTT = async (
         message.user_properties = {};
       }
 
-      message.user_properties['asset_type_id'] = pipeline.asset_type_id;
-      message.user_properties['asset_id'] = histRow.asset_id;
-      message.user_properties['change_date'] = histRow.change_date;
+      message.user_properties["asset_type_id"] = pipeline.asset_type_id;
+      message.user_properties["asset_id"] = histRow.asset_id;
+      message.user_properties["change_date"] = histRow.change_date;
 
       try {
         await client.publish(topic, message);
@@ -208,7 +140,7 @@ const publishBatchToMQTT = async (
       }
     }
   } catch (error) {
-    console.error('Error publishing batch to MQTT:', error);
+    console.error("Error publishing batch to MQTT:", error);
     throw error;
   }
 };
@@ -222,7 +154,7 @@ const filterRelevantAttributes = (
 
   for (const [key, value] of Object.entries(customData)) {
     // Exclude any predicted_ attributes (these shouldn't be in training data)
-    if (key.startsWith('predicted_')) {
+    if (key.startsWith("predicted_")) {
       continue;
     }
 
@@ -236,13 +168,18 @@ const filterRelevantAttributes = (
 };
 
 // Safely update sync times in forecast_ml_pipelines collection at the end of migration
-export const updateSyncTimesInPipelines = async (localSyncTracker: LocalSyncTracker): Promise<void> => {
+export const updateSyncTimesInPipelines = async (
+  localSyncTracker: LocalSyncTracker,
+): Promise<void> => {
   if (Object.keys(localSyncTracker).length === 0) {
     return;
   }
 
   // Use lock to prevent race condition with ForecastManager
-  const lock = ClearBladeAsync.Lock('forecast_ml_pipelines_update', 'AssetHistoryMigrator');
+  const lock = ClearBladeAsync.Lock(
+    "forecast_ml_pipelines_update",
+    "AssetHistoryMigrator",
+  );
 
   try {
     await lock.lock();
@@ -270,17 +207,23 @@ export const updateSyncTimesInPipelines = async (localSyncTracker: LocalSyncTrac
     // Batch update all modified pipelines
     if (updatedPipelines.length > 0) {
       const col = ClearBladeAsync.Collection<PipelineData>({
-        collectionName: 'forecast_ml_pipelines',
+        collectionName: "forecast_ml_pipelines",
       });
 
       const updatePromises = updatedPipelines.map((pipeline) => {
-        return col.update(ClearBladeAsync.Query().equalTo('asset_type_id', pipeline.asset_type_id), pipeline);
+        return col.update(
+          ClearBladeAsync.Query().equalTo(
+            "asset_type_id",
+            pipeline.asset_type_id,
+          ),
+          pipeline,
+        );
       });
 
       await Promise.all(updatePromises);
     }
   } catch (error) {
-    console.error('Error updating sync times in pipelines:', error);
+    console.error("Error updating sync times in pipelines:", error);
     throw error;
   } finally {
     await lock.unlock();
@@ -304,7 +247,7 @@ export const migrateAssetHistoryBatch = async (
     // Create MQTT client only once per asset migration
     mqttClient = new MQTT.Client();
 
-    const col = ClearBladeAsync.Collection('_asset_history');
+    const col = ClearBladeAsync.Collection("_asset_history");
 
     // Use optimized query that filters at database level
     const baseQuery = createOptimizedQuery(assetInfo, pipeline, new Date());
@@ -315,9 +258,12 @@ export const migrateAssetHistoryBatch = async (
 
     while (hasMoreData) {
       // Check runtime before processing each batch
-      const runtimeMinutes = (new Date().getTime() - startTime.getTime()) / (1000 * 60);
+      const runtimeMinutes =
+        (new Date().getTime() - startTime.getTime()) / (1000 * 60);
       if (runtimeMinutes >= maxRuntimeMinutes) {
-        console.log(`Reached runtime limit while processing asset ${assetInfo.assetId}, stopping`);
+        console.log(
+          `Reached runtime limit while processing asset ${assetInfo.assetId}, stopping`,
+        );
         break;
       }
 
@@ -352,15 +298,21 @@ export const migrateAssetHistoryBatch = async (
       localSyncTracker[assetInfo.assetId] = lastProcessedTimestamp;
     }
   } catch (error) {
-    console.error(`Error in migrateAssetHistoryBatch for asset ${assetInfo.assetId}:`, error);
+    console.error(
+      `Error in migrateAssetHistoryBatch for asset ${assetInfo.assetId}:`,
+      error,
+    );
     throw error;
   } finally {
     // Clean up MQTT client
-    if (mqttClient && typeof (mqttClient as MQTTClient).disconnect === 'function') {
+    if (
+      mqttClient &&
+      typeof (mqttClient as MQTTClient).disconnect === "function"
+    ) {
       try {
         await (mqttClient as MQTTClient).disconnect();
       } catch (disconnectError) {
-        console.warn('Failed to disconnect MQTT client:', disconnectError);
+        console.warn("Failed to disconnect MQTT client:", disconnectError);
       }
     }
   }
