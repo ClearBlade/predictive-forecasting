@@ -48,7 +48,12 @@ const createOptimizedQuery = (
   let baseConditions = `asset_id = '${assetInfo.assetId}'`;
 
   if (assetInfo.last_bq_sync_time) {
-    baseConditions += ` AND change_date > '${assetInfo.last_bq_sync_time}'`;
+    const lastSyncTime = new Date(assetInfo.last_bq_sync_time);
+    if (lastSyncTime >= currentTime) {
+      baseConditions += ` AND FALSE`;
+    } else {
+      baseConditions += ` AND change_date > '${assetInfo.last_bq_sync_time}'`;
+    }
   }
 
   baseConditions += ` AND change_date < '${currentTime.toISOString()}'`;
@@ -240,6 +245,14 @@ export const migrateAssetHistoryBatch = async (
   maxRuntimeMinutes: number,
   localSyncTracker: LocalSyncTracker,
 ): Promise<number> => {
+  const currentTime = new Date();
+  if (assetInfo.last_bq_sync_time) {
+    const lastSyncTime = new Date(assetInfo.last_bq_sync_time);
+    if (lastSyncTime >= currentTime) {
+      return 0;
+    }
+  }
+
   let batchesProcessed = 0;
   let mqttClient: MQTTClient | null = null;
 
@@ -261,9 +274,6 @@ export const migrateAssetHistoryBatch = async (
       const runtimeMinutes =
         (new Date().getTime() - startTime.getTime()) / (1000 * 60);
       if (runtimeMinutes >= maxRuntimeMinutes) {
-        console.log(
-          `Reached runtime limit while processing asset ${assetInfo.assetId}, stopping`,
-        );
         break;
       }
 
