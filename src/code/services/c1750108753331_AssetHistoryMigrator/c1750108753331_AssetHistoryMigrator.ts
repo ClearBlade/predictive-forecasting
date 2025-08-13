@@ -19,15 +19,10 @@ import {
   migrateAssetHistoryBatch,
   updateSyncTimesInPipelines,
 } from "./utils";
-import {
-  TIMER_TOPIC,
-  MAX_RUNTIME_MINUTES,
-  BATCH_SIZE,
-  SLEEP_BETWEEN_BATCHES_MS,
-  PipelineData,
-  AssetInfo,
-  LocalSyncTracker,
-} from "./types";
+import { PipelineData, AssetInfo, LocalSyncTracker } from "./types";
+
+const TIMER_TOPIC = "$timer/c1750108753331_AssetHistoryMigrator_Timer";
+const MAX_RUNTIME_MINUTES = 15; // 15 minutes max per cycle with 5-minute timer intervals
 
 function c1750108753331_AssetHistoryMigrator(
   _: CbServer.BasicReq,
@@ -115,8 +110,6 @@ async function runMigrationCycle(): Promise<void> {
         await migrateAssetHistoryBatch(
           assetInfo,
           pipeline,
-          BATCH_SIZE,
-          SLEEP_BETWEEN_BATCHES_MS,
           startTime,
           MAX_RUNTIME_MINUTES,
           localSyncTracker,

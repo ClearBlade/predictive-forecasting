@@ -1,5 +1,4 @@
 import {
-  MQTTClient,
   MQTTGlobal,
   PipelineData,
   AssetHistoryRow,
@@ -8,6 +7,8 @@ import {
 } from "./types";
 
 declare const MQTT: MQTTGlobal;
+const BATCH_SIZE = 1000;
+const SLEEP_BETWEEN_BATCHES_MS = 50;
 
 // Get all forecast pipelines
 export const getPipelines = async (): Promise<PipelineData[]> => {
@@ -36,45 +37,28 @@ export const getAllAssetIds = (pipelines: PipelineData[]): AssetInfo[] => {
   return assetInfos;
 };
 
-// Create optimized query that filters rows at database level using JSONB operations
-const createOptimizedQuery = (
-  assetInfo: AssetInfo,
-  pipeline: PipelineData,
-  currentTime: Date,
-) => {
-  const forecastAttributes = getForecastAttributes(pipeline);
-  const attributeNames = Array.from(forecastAttributes);
+// Create optimized query that filters rows at database level using native ClearBlade queries
+const createOptimizedQuery = (assetInfo: AssetInfo, currentTime: Date) => {
+  let query = ClearBladeAsync.Query().equalTo("asset_id", assetInfo.assetId);
 
-  let baseConditions = `asset_id = '${assetInfo.assetId}'`;
-
+  // Add time-based filtering
   if (assetInfo.last_bq_sync_time) {
     const lastSyncTime = new Date(assetInfo.last_bq_sync_time);
     if (lastSyncTime >= currentTime) {
-      baseConditions += ` AND FALSE`;
+      // Return empty query if last sync is in future
+      query = query.equalTo(
+        "asset_id",
+        "impossible_asset_id_that_will_return_nothing",
+      );
     } else {
-      baseConditions += ` AND change_date > '${assetInfo.last_bq_sync_time}'`;
+      query = query.greaterThan("change_date", assetInfo.last_bq_sync_time);
     }
   }
 
-  baseConditions += ` AND change_date < '${currentTime.toISOString()}'`;
+  // Add current time cutoff
+  query = query.lessThan("change_date", currentTime.toISOString());
 
-  if (attributeNames.length > 0) {
-    const attributeArray = `ARRAY[${attributeNames.map((name) => `'${name}'`).join(", ")}]`;
-    baseConditions += ` AND changes->'custom_data' ?| ${attributeArray}`;
-
-    baseConditions += ` AND NOT EXISTS (
-      SELECT 1 FROM jsonb_object_keys(changes->'custom_data') AS key 
-      WHERE key LIKE 'predicted_%'
-    )`;
-  }
-
-  const rawQuery = `
-    SELECT * FROM _asset_history 
-    WHERE ${baseConditions}
-    ORDER BY change_date ASC
-  `;
-
-  return ClearBladeAsync.Query().rawQuery(rawQuery);
+  return query;
 };
 
 // Get set of all forecast and supporting attribute names for a pipeline
@@ -93,7 +77,7 @@ const getForecastAttributes = (pipeline: PipelineData): Set<string> => {
 const publishBatchToMQTT = async (
   histRows: AssetHistoryRow[],
   pipeline: PipelineData,
-  client: MQTTClient,
+  client: CbServer.MQTTClient,
 ): Promise<void> => {
   try {
     let consecutiveFailures = 0;
@@ -239,8 +223,6 @@ export const updateSyncTimesInPipelines = async (
 export const migrateAssetHistoryBatch = async (
   assetInfo: AssetInfo,
   pipeline: PipelineData,
-  batchSize: number,
-  sleepMs: number,
   startTime: Date,
   maxRuntimeMinutes: number,
   localSyncTracker: LocalSyncTracker,
@@ -254,7 +236,7 @@ export const migrateAssetHistoryBatch = async (
   }
 
   let batchesProcessed = 0;
-  let mqttClient: MQTTClient | null = null;
+  let mqttClient: CbServer.MQTTClient | null = null;
 
   try {
     // Create MQTT client only once per asset migration
@@ -263,9 +245,9 @@ export const migrateAssetHistoryBatch = async (
     const col = ClearBladeAsync.Collection("_asset_history");
 
     // Use optimized query that filters at database level
-    const baseQuery = createOptimizedQuery(assetInfo, pipeline, new Date());
+    const baseQuery = createOptimizedQuery(assetInfo, new Date());
 
-    let pageNum = 0;
+    let pageNum = 1;
     let hasMoreData = true;
     let lastProcessedTimestamp: string | null = null;
 
@@ -274,33 +256,59 @@ export const migrateAssetHistoryBatch = async (
       const runtimeMinutes =
         (new Date().getTime() - startTime.getTime()) / (1000 * 60);
       if (runtimeMinutes >= maxRuntimeMinutes) {
+        //will break with hasMoreData still true
         break;
       }
 
-      const paginatedQuery = baseQuery.setPage(batchSize, pageNum);
+      const paginatedQuery = baseQuery.setPage(BATCH_SIZE, pageNum);
       const historyData = await col.fetch(paginatedQuery);
 
       if (historyData.DATA && historyData.DATA.length > 0) {
-        const histRows = historyData.DATA as unknown as AssetHistoryRow[];
+        let histRows = historyData.DATA as unknown as AssetHistoryRow[];
+
+        // Application-level filtering since native queries can't handle complex JSONB operations
+        const forecastAttributes = getForecastAttributes(pipeline);
+
+        // Filter for rows that have forecast attributes and don't have predicted attributes
+        histRows = histRows.filter((row) => {
+          if (!row.changes?.custom_data) return false;
+
+          const customDataKeys = Object.keys(row.changes.custom_data);
+
+          // Skip rows with predicted attributes
+          if (customDataKeys.some((key) => key.startsWith("predicted_"))) {
+            return false;
+          }
+
+          // Only include rows that have at least one forecast attribute
+          return customDataKeys.some((key) => forecastAttributes.has(key));
+        });
+
+        if (histRows.length === 0) {
+          pageNum++;
+          continue;
+        }
 
         await publishBatchToMQTT(histRows, pipeline, mqttClient);
 
-        lastProcessedTimestamp = histRows[histRows.length - 1].change_date;
+        if (histRows.length > 0) {
+          lastProcessedTimestamp = histRows[histRows.length - 1].change_date;
+        }
 
         batchesProcessed++;
         pageNum++;
 
-        if (histRows.length < batchSize) {
-          hasMoreData = false;
-        }
-
         // Sleep between batches to avoid overwhelming MQTT
-        if (sleepMs > 0) {
-          await new Promise((resolve) => setTimeout(resolve, sleepMs));
-        }
+        await new Promise((resolve) =>
+          setTimeout(resolve, SLEEP_BETWEEN_BATCHES_MS),
+        );
       } else {
         hasMoreData = false;
       }
+    }
+
+    if (!hasMoreData && pageNum > 1) {
+      lastProcessedTimestamp = currentTime.toISOString();
     }
 
     // Update local sync tracker if we processed any data
@@ -313,19 +321,6 @@ export const migrateAssetHistoryBatch = async (
       error,
     );
     throw error;
-  } finally {
-    // Clean up MQTT client
-    if (
-      mqttClient &&
-      typeof (mqttClient as MQTTClient).disconnect === "function"
-    ) {
-      try {
-        await (mqttClient as MQTTClient).disconnect();
-      } catch (disconnectError) {
-        console.warn("Failed to disconnect MQTT client:", disconnectError);
-      }
-    }
   }
-
   return batchesProcessed;
 };
