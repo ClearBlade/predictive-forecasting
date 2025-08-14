@@ -1,6 +1,6 @@
-import { AssetType } from '@clearblade/ia-mfe-core';
+import { AssetType } from "@clearblade/ia-mfe-core";
 
-type Attributes = AssetType['frontend']['schema'][number];
+type Attributes = AssetType["frontend"]["schema"][number];
 
 interface MQTTMessage {
   payload: string;

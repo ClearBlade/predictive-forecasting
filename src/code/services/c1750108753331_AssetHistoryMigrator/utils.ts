@@ -306,9 +306,14 @@ export const migrateAssetHistoryBatch = async (
         hasMoreData = false;
       }
     }
-
-    if (!hasMoreData && pageNum > 1) {
-      lastProcessedTimestamp = currentTime.toISOString();
+    if (!hasMoreData && pageNum > 2) {
+      console.log(
+        "Mass Migration Complete for asset: ",
+        assetInfo.assetId,
+        "In: ",
+        (new Date().getTime() - startTime.getTime()) / (1000 * 60),
+        "minutes",
+      );
     }
 
     // Update local sync tracker if we processed any data
