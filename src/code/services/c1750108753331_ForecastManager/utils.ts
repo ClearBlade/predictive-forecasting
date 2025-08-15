@@ -1,18 +1,17 @@
-import { AssetHistory } from '@ia/common/collection-types/asset_history';
-import { AttrSchemaRt } from '@ia/common/misc/attributes';
-import { rt } from '@ia/common/lib/runtypes';
+import { AssetType } from "@clearblade/ia-mfe-core";
 
-const PROJECT_ID = 'clearblade-ipm';
-const DATASET_ID = 'predictive_forecasting';
-const TABLE_ID = cbmeta.system_key + '_forecast';
-const SCRIPT_PATH = 'gs://clearblade-predictive-forecasting/forecast-script/SageFormer_IoT_Forecasting.py';
-const LOCATION = 'us-central1';
+const PROJECT_ID = "clearblade-ipm";
+const DATASET_ID = "predictive_forecasting";
+const TABLE_ID = cbmeta.system_key + "_forecast";
+const SCRIPT_PATH =
+  "gs://clearblade-predictive-forecasting/forecast-script/SageFormer_IoT_Forecasting.py";
+const LOCATION = "us-central1";
 const VERTEX_AI_ENDPOINT = `https://${LOCATION}-aiplatform.googleapis.com/v1`;
 const TRAINING_TEMPLATE_URI =
-  'https://us-central1-kfp.pkg.dev/clearblade-ipm/cb-ml-pipelines/forecast-train-pipeline-template/sha256:c567c7f3c370df07d5699a2ad6fc3aed09a9a08d6cd22ad83e136110e79a970d';
+  "https://us-central1-kfp.pkg.dev/clearblade-ipm/cb-ml-pipelines/forecast-train-pipeline-template/sha256:c567c7f3c370df07d5699a2ad6fc3aed09a9a08d6cd22ad83e136110e79a970d";
 const INFERENCE_TEMPLATE_URI =
-  'https://us-central1-kfp.pkg.dev/clearblade-ipm/cb-ml-pipelines/forecast-inference-pipeline-template/sha256:f72f73fef903ea690380b82f7048233555cab44022b9ab7eaa5944b78116ed30';
-const OUTPUT_DIRECTORY = 'gs://clearblade-predictive-forecasting';
+  "https://us-central1-kfp.pkg.dev/clearblade-ipm/cb-ml-pipelines/forecast-inference-pipeline-template/sha256:f72f73fef903ea690380b82f7048233555cab44022b9ab7eaa5944b78116ed30";
+const OUTPUT_DIRECTORY = "gs://clearblade-predictive-forecasting";
 
 interface AssetManagementData {
   id: string; //the asset id that forecasting will be set up for
@@ -24,7 +23,7 @@ interface AssetManagementData {
   asset_model?: string | null; //the gsutil path to this asset's forecast model
 }
 
-type Attributes = rt.Static<typeof AttrSchemaRt>;
+type Attributes = AssetType["frontend"]["schema"][number];
 
 export interface PipelineData {
   asset_type_id: string; //the asset type id that forecasting will be set up for
@@ -69,7 +68,7 @@ interface FileSystem {
 
 export const getPipelines = async (): Promise<PipelineData[]> => {
   const col = ClearBladeAsync.Collection<PipelineData>({
-    collectionName: 'forecast_ml_pipelines',
+    collectionName: "forecast_ml_pipelines",
   });
   const data = await col.fetch(ClearBladeAsync.Query());
   if (data.TOTAL === 0) return [];
@@ -77,10 +76,16 @@ export const getPipelines = async (): Promise<PipelineData[]> => {
 };
 
 // Checks if there is at least 5x the forecast length of data in the _asset_history collection for the asset
-export const isThresholdMet = async (assetId: string, timeStep: number): Promise<boolean> => {
+export const isThresholdMet = async (
+  assetId: string,
+  timeStep: number,
+): Promise<boolean> => {
   try {
-    const col = ClearBladeAsync.Collection('_asset_history');
-    const query = ClearBladeAsync.Query().equalTo('asset_id', assetId).setPage(0, 1).ascending('change_date');
+    const col = ClearBladeAsync.Collection("_asset_history");
+    const query = ClearBladeAsync.Query()
+      .equalTo("asset_id", assetId)
+      .setPage(0, 1)
+      .ascending("change_date");
 
     const data = await col.fetch(query);
 
@@ -88,21 +93,25 @@ export const isThresholdMet = async (assetId: string, timeStep: number): Promise
       return false;
     }
 
-    const oldestRecord = data.DATA[0] as AssetHistory['frontend']; //TODO:need to define this any
+    const oldestRecord = data.DATA[0] as AssetHistoryRow;
     const oldestDate = new Date(oldestRecord.change_date);
     const currentTime = new Date();
 
     const thresholdMinutes = 5 * timeStep * 672 + timeStep * 96;
-    const thresholdTime = new Date(currentTime.getTime() - thresholdMinutes * 60 * 1000);
+    const thresholdTime = new Date(
+      currentTime.getTime() - thresholdMinutes * 60 * 1000,
+    );
     return oldestDate < thresholdTime;
   } catch (error) {
-    console.error('Error checking threshold:', error);
+    console.error("Error checking threshold:", error);
     return false;
   }
 };
 
 // if current time is greater than next_train_time and BigQuery sync is recent, then return true, otherwise return false
-export const shouldRunTrainingPipeline = (asset: AssetManagementData): boolean => {
+export const shouldRunTrainingPipeline = (
+  asset: AssetManagementData,
+): boolean => {
   if (!asset.next_train_time) {
     return false;
   }
@@ -115,18 +124,24 @@ export const shouldRunTrainingPipeline = (asset: AssetManagementData): boolean =
     const lastSyncTime = new Date(asset.last_bq_sync_time);
     const syncDeadline = new Date(nextTrainTime.getTime() - 30 * 60 * 1000); // 30 minutes before
     if (lastSyncTime < syncDeadline) {
-      console.log(`Training delayed for asset ${asset.id}: BigQuery sync too old (${asset.last_bq_sync_time})`);
+      console.log(
+        `Training delayed for asset ${asset.id}: BigQuery sync too old (${asset.last_bq_sync_time})`,
+      );
       return false;
     }
   } else {
-    console.log(`Training delayed for asset ${asset.id}: No BigQuery sync recorded`);
+    console.log(
+      `Training delayed for asset ${asset.id}: No BigQuery sync recorded`,
+    );
     return false;
   }
   return true;
 };
 
 // if current time is greater than next_inference_time, asset_model is not null, and BigQuery sync is recent, then return true, otherwise return false
-export const shouldRunInferencePipeline = (asset: AssetManagementData): boolean => {
+export const shouldRunInferencePipeline = (
+  asset: AssetManagementData,
+): boolean => {
   if (!asset.next_inference_time || !asset.asset_model) {
     return false;
   }
@@ -139,11 +154,15 @@ export const shouldRunInferencePipeline = (asset: AssetManagementData): boolean 
     const lastSyncTime = new Date(asset.last_bq_sync_time);
     const syncDeadline = new Date(nextInferenceTime.getTime() - 15 * 60 * 1000); // 15 minutes before
     if (lastSyncTime < syncDeadline) {
-      console.log(`Inference delayed for asset ${asset.id}: BigQuery sync too old (${asset.last_bq_sync_time})`);
+      console.log(
+        `Inference delayed for asset ${asset.id}: BigQuery sync too old (${asset.last_bq_sync_time})`,
+      );
       return false;
     }
   } else {
-    console.log(`Inference delayed for asset ${asset.id}: No BigQuery sync recorded`);
+    console.log(
+      `Inference delayed for asset ${asset.id}: No BigQuery sync recorded`,
+    );
     return false;
   }
   return true;
@@ -156,26 +175,32 @@ export const startTrainingPipeline = async (
 ): Promise<{ error: boolean; message: string }> => {
   const response: { error: boolean; message: string } = {
     error: true,
-    message: '',
+    message: "",
   };
 
   try {
     const allSubscriptions = await AccessTokenCache()
       .getAll()
       .catch((err) => Promise.reject({ error: true, message: err }));
-    const bigQueryToken = allSubscriptions['google-bigquery-forecasting-config'].accessToken;
+    const bigQueryToken =
+      allSubscriptions["google-bigquery-forecasting-config"].accessToken;
 
     if (!bigQueryToken) {
       throw new Error(
         "BigQuery Token is undefined or empty. Please check the subscription 'google-bigquery-forecasting-config'.",
       );
     }
-    const timestamp = new Date().toISOString().replace(/[-:Z]/g, '').replace(/\./g, '').replace('T', '').slice(0, -3);
-    const modelId = asset.id + '_' + timestamp;
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[-:Z]/g, "")
+      .replace(/\./g, "")
+      .replace("T", "")
+      .slice(0, -3);
+    const modelId = asset.id + "_" + timestamp;
     const pipelineConfig = {
       displayName: modelId,
       runtimeConfig: {
-        gcsOutputDirectory: OUTPUT_DIRECTORY + '/pipeline',
+        gcsOutputDirectory: OUTPUT_DIRECTORY + "/pipeline",
         parameterValues: {
           bq_query: `SELECT date_time, asset_type_id, asset_id, data  FROM \`${PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`  WHERE asset_id = '${asset.id}' AND asset_type_id = '${pipelineData.asset_type_id}' ORDER BY date_time`,
           gcp_project_id: PROJECT_ID,
@@ -186,17 +211,17 @@ export const startTrainingPipeline = async (
           script_gcs_path: SCRIPT_PATH,
         },
       },
-      serviceAccount: 'bigqueryadmin@clearblade-ipm.iam.gserviceaccount.com',
+      serviceAccount: "bigqueryadmin@clearblade-ipm.iam.gserviceaccount.com",
       templateUri: TRAINING_TEMPLATE_URI,
     };
 
     const pipelineResponse = await fetch(
       `${VERTEX_AI_ENDPOINT}/projects/${PROJECT_ID}/locations/${LOCATION}/pipelineJobs`,
       {
-        method: 'POST',
+        method: "POST",
         headers: {
           Authorization: `Bearer ${bigQueryToken}`,
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(pipelineConfig),
       },
@@ -217,7 +242,7 @@ export const startTrainingPipeline = async (
     return response;
   } catch (error) {
     response.message = error + JSON.stringify(error);
-    console.error('Error:', error);
+    console.error("Error:", error);
     return response;
   }
 };
@@ -229,26 +254,32 @@ export const startInferencePipeline = async (
 ): Promise<{ error: boolean; message: string }> => {
   const response: { error: boolean; message: string } = {
     error: true,
-    message: '',
+    message: "",
   };
 
   try {
     const allSubscriptions = await AccessTokenCache()
       .getAll()
       .catch((err) => Promise.reject({ error: true, message: err }));
-    const bigQueryToken = allSubscriptions['google-bigquery-forecasting-config'].accessToken;
+    const bigQueryToken =
+      allSubscriptions["google-bigquery-forecasting-config"].accessToken;
 
     if (!bigQueryToken) {
       throw new Error(
         "BigQuery Token is undefined or empty. Please check the subscription 'google-bigquery-forecasting-config'.",
       );
     }
-    const timestamp = new Date().toISOString().replace(/[-:Z]/g, '').replace(/\./g, '').replace('T', '').slice(0, -3);
-    const modelId = asset.id + '_' + timestamp;
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[-:Z]/g, "")
+      .replace(/\./g, "")
+      .replace("T", "")
+      .slice(0, -3);
+    const modelId = asset.id + "_" + timestamp;
     const pipelineConfig = {
       displayName: modelId,
       runtimeConfig: {
-        gcsOutputDirectory: OUTPUT_DIRECTORY + '/pipeline',
+        gcsOutputDirectory: OUTPUT_DIRECTORY + "/pipeline",
         parameterValues: {
           bq_query: `SELECT date_time, asset_type_id, asset_id, data  FROM \`${PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`  WHERE asset_id = '${asset.id}' AND asset_type_id = '${pipelineData.asset_type_id}' ORDER BY date_time`,
           gcp_project_id: PROJECT_ID,
@@ -259,17 +290,17 @@ export const startInferencePipeline = async (
           asset_id: asset.id,
         },
       },
-      serviceAccount: 'bigqueryadmin@clearblade-ipm.iam.gserviceaccount.com',
+      serviceAccount: "bigqueryadmin@clearblade-ipm.iam.gserviceaccount.com",
       templateUri: INFERENCE_TEMPLATE_URI,
     };
 
     const pipelineResponse = await fetch(
       `${VERTEX_AI_ENDPOINT}/projects/${PROJECT_ID}/locations/${LOCATION}/pipelineJobs`,
       {
-        method: 'POST',
+        method: "POST",
         headers: {
           Authorization: `Bearer ${bigQueryToken}`,
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(pipelineConfig),
       },
@@ -290,24 +321,32 @@ export const startInferencePipeline = async (
     return response;
   } catch (error) {
     response.message = error + JSON.stringify(error);
-    console.error('Error:', error);
+    console.error("Error:", error);
     return response;
   }
 };
 
 //update the forecast_ml_pipelines collection
-export const updatePipelineRows = async (rows: PipelineData[]): Promise<void> => {
+export const updatePipelineRows = async (
+  rows: PipelineData[],
+): Promise<void> => {
   // Use lock to prevent race condition with AssetHistoryMigrator
-  const lock = ClearBladeAsync.Lock('forecast_ml_pipelines_update', 'ForecastManager');
+  const lock = ClearBladeAsync.Lock(
+    "forecast_ml_pipelines_update",
+    "ForecastManager",
+  );
 
   try {
     await lock.lock();
 
     const col = ClearBladeAsync.Collection({
-      collectionName: 'forecast_ml_pipelines',
+      collectionName: "forecast_ml_pipelines",
     });
     const promises = rows.map((row) => {
-      return col.update(ClearBladeAsync.Query().equalTo('asset_type_id', row.asset_type_id), row);
+      return col.update(
+        ClearBladeAsync.Query().equalTo("asset_type_id", row.asset_type_id),
+        row,
+      );
     });
     await Promise.all(promises);
   } finally {
@@ -315,49 +354,55 @@ export const updatePipelineRows = async (rows: PipelineData[]): Promise<void> =>
   }
 };
 
-const cacheName = 'AccessTokenCache';
+const cacheName = "AccessTokenCache";
 
 const AccessTokenCache = (asyncClient = ClearBladeAsync) => {
   const cache = asyncClient.Cache<SubscriptionConfig>(cacheName);
 
   return {
     getAll: () => cache.getAll(),
-    set: (subscriptionID: string, data: SubscriptionConfig) => cache.set(subscriptionID, data),
+    set: (subscriptionID: string, data: SubscriptionConfig) =>
+      cache.set(subscriptionID, data),
   };
 };
 
 // fetch the asset model gsutil path from the file system
 export const getAssetModel = async (assetId: string): Promise<string> => {
   try {
-    const fs = ClearBladeAsync.FS('ia-forecasting');
+    const fs = ClearBladeAsync.FS("ia-forecasting");
     const modelPath = `outbox/${assetId}/models/${assetId}.pth`;
     try {
       await fs.readFile(modelPath);
       const gsutilPath = `gs://clearblade-predictive-forecasting/${cbmeta.system_key}/ia-forecasting/${modelPath}`;
       return gsutilPath;
     } catch (fileError) {
-      return '';
+      return "";
     }
   } catch (error) {
     console.error(`Error getting asset model for ${assetId}:`, error);
-    throw new Error(`Failed to get asset model: ${getErrorMessage(error)}`);
+    throw new Error(`Failed to get asset model: ${error}`);
   }
 };
 
-const findLatestForecastFile = async (fs: FileSystem, forecastFolderPath: string): Promise<string | null> => {
+const findLatestForecastFile = async (
+  fs: FileSystem,
+  forecastFolderPath: string,
+): Promise<string | null> => {
   try {
     const folderContents = await fs.readDir(forecastFolderPath);
-    const forecastFiles = folderContents.filter((path: string) => path.endsWith('.csv') && !path.includes('processed'));
+    const forecastFiles = folderContents.filter(
+      (path: string) => path.endsWith(".csv") && !path.includes("processed"),
+    );
 
     if (forecastFiles.length === 0) {
       return null;
     }
 
-    let latestFile = '';
-    let latestTimestamp = '';
+    let latestFile = "";
+    let latestTimestamp = "";
 
     for (const filePath of forecastFiles) {
-      const fileName = filePath.split('/').pop();
+      const fileName = filePath.split("/").pop();
       if (!fileName) continue;
 
       const timestampMatch = fileName.match(/(\d{14})\.csv$/);
@@ -377,24 +422,27 @@ const findLatestForecastFile = async (fs: FileSystem, forecastFolderPath: string
 };
 
 // extract the forecast data from the forecast csv
-const extractForecastData = async (fs: FileSystem, forecastFilePath: string): Promise<ForecastData[]> => {
+const extractForecastData = async (
+  fs: FileSystem,
+  forecastFilePath: string,
+): Promise<ForecastData[]> => {
   try {
     const forecastData: ForecastData[] = [];
 
-    const fileContent = (await fs.readFile(forecastFilePath, 'utf8')) as string;
+    const fileContent = (await fs.readFile(forecastFilePath, "utf8")) as string;
 
     // Parse CSV forecast data
-    const lines = fileContent.split('\n').filter((line: string) => line.trim());
+    const lines = fileContent.split("\n").filter((line: string) => line.trim());
 
     if (lines.length < 2) {
       console.warn(`Forecast file ${forecastFilePath} has insufficient data`);
       return [];
     }
 
-    const headers = lines[0].split(',').map((h: string) => h.trim());
+    const headers = lines[0].split(",").map((h: string) => h.trim());
 
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map((v: string) => v.trim());
+      const values = lines[i].split(",").map((v: string) => v.trim());
 
       if (values.length !== headers.length) {
         console.warn(`Skipping malformed row ${i} in ${forecastFilePath}`);
@@ -421,7 +469,9 @@ const extractForecastData = async (fs: FileSystem, forecastFilePath: string): Pr
 
     return forecastData;
   } catch (error) {
-    throw new Error(`Failed to extract forecast data: ${getErrorMessage(error)}`);
+    throw new Error(
+      `Failed to extract forecast data: ${error}`,
+    );
   }
 };
 
@@ -433,25 +483,29 @@ const updateAssetHistoryWithForecasts = async (
 ): Promise<boolean> => {
   if (forecastData.length === 0) return false;
 
-  const col = ClearBladeAsync.Collection('_asset_history');
+  const col = ClearBladeAsync.Collection("_asset_history");
 
   const historyUpdates = forecastData
-    .filter((forecast) => forecast.timestamp && Object.keys(forecast.predictions).length > 0)
+    .filter(
+      (forecast) =>
+        forecast.timestamp && Object.keys(forecast.predictions).length > 0,
+    )
     .map((forecast) => {
       const customData: Record<string, number> = {};
       Object.entries(forecast.predictions).forEach(([columnName, value]) => {
-        if (columnName.includes('predicted')) {
+        if (columnName.includes("predicted")) {
           for (const attrName of attributesToPredict) {
             if (columnName.includes(attrName)) {
               let targetAttributeName: string;
-              if (columnName.includes('upper')) {
+              if (columnName.includes("upper")) {
                 targetAttributeName = `predicted_${attrName}_upper_bound`;
-              } else if (columnName.includes('lower')) {
+              } else if (columnName.includes("lower")) {
                 targetAttributeName = `predicted_${attrName}_lower_bound`;
               } else {
                 targetAttributeName = `predicted_${attrName}`;
               }
-              customData[targetAttributeName] = typeof value === 'number' ? value : parseFloat(String(value));
+              customData[targetAttributeName] =
+                typeof value === "number" ? value : parseFloat(String(value));
               break;
             }
           }
@@ -460,14 +514,15 @@ const updateAssetHistoryWithForecasts = async (
             if (columnName.includes(attrName)) {
               let targetAttributeName: string;
 
-              if (columnName.includes('upper')) {
+              if (columnName.includes("upper")) {
                 targetAttributeName = `predicted_${attrName}_upper_bound`;
-              } else if (columnName.includes('lower')) {
+              } else if (columnName.includes("lower")) {
                 targetAttributeName = `predicted_${attrName}_lower_bound`;
               } else {
                 targetAttributeName = `predicted_${attrName}`;
               }
-              customData[targetAttributeName] = typeof value === 'number' ? value : parseFloat(String(value));
+              customData[targetAttributeName] =
+                typeof value === "number" ? value : parseFloat(String(value));
               break; // Found the attribute, no need to check others
             }
           }
@@ -487,9 +542,13 @@ const updateAssetHistoryWithForecasts = async (
   }
 
   const earliestUpdate = historyUpdates.reduce((earliest, current) =>
-    new Date(current.change_date) < new Date(earliest.change_date) ? current : earliest,
+    new Date(current.change_date) < new Date(earliest.change_date)
+      ? current
+      : earliest,
   );
-  const cutoffTime = new Date(new Date(earliestUpdate.change_date).getTime() - 60 * 1000);
+  const cutoffTime = new Date(
+    new Date(earliestUpdate.change_date).getTime() - 60 * 1000,
+  );
 
   // Clear old forecast data before inserting new forecasts
   await clearOldForecast(assetId, cutoffTime);
@@ -502,8 +561,8 @@ const updateAssetHistoryWithForecasts = async (
     try {
       await Promise.all(
         batch.map((update) =>
-          col.create(update).catch((error) => {
-            console.warn(`Failed to insert forecast record for ${assetId} at ${update.change_date}:`, error);
+          col.create(update).catch(() => {
+            //Do nothing
           }),
         ),
       );
@@ -516,13 +575,16 @@ const updateAssetHistoryWithForecasts = async (
 };
 
 // Clear old forecast data from asset history before inserting new forecasts
-const clearOldForecast = async (assetId: string, cutoffTime: Date): Promise<void> => {
+const clearOldForecast = async (
+  assetId: string,
+  cutoffTime: Date,
+): Promise<void> => {
   try {
-    const col = ClearBladeAsync.Collection('_asset_history');
+    const col = ClearBladeAsync.Collection("_asset_history");
     const query = ClearBladeAsync.Query()
-      .equalTo('asset_id', assetId)
-      .greaterThan('change_date', cutoffTime.toISOString())
-      .ascending('change_date');
+      .equalTo("asset_id", assetId)
+      .greaterThan("change_date", cutoffTime.toISOString())
+      .ascending("change_date");
 
     let pageNum = 0;
     const pageSize = 100;
@@ -535,16 +597,20 @@ const clearOldForecast = async (assetId: string, cutoffTime: Date): Promise<void
 
       if (historyData.DATA && historyData.DATA.length > 0) {
         // Check each record for predicted_ properties
-        (historyData.DATA as unknown as AssetHistoryRow[]).forEach((record: AssetHistoryRow) => {
-          if (record.changes && record.changes.custom_data) {
-            const customData = record.changes.custom_data;
-            const hasPredictedData = Object.keys(customData).some((key) => key.startsWith('predicted_'));
+        (historyData.DATA as unknown as AssetHistoryRow[]).forEach(
+          (record: AssetHistoryRow) => {
+            if (record.changes && record.changes.custom_data) {
+              const customData = record.changes.custom_data;
+              const hasPredictedData = Object.keys(customData).some((key) =>
+                key.startsWith("predicted_"),
+              );
 
-            if (hasPredictedData && record.item_id) {
-              recordsToDelete.push(record.item_id);
+              if (hasPredictedData && record.item_id) {
+                recordsToDelete.push(record.item_id);
+              }
             }
-          }
-        });
+          },
+        );
         pageNum++;
       } else {
         hasMoreData = false;
@@ -558,9 +624,11 @@ const clearOldForecast = async (assetId: string, cutoffTime: Date): Promise<void
         try {
           await Promise.all(
             batch.map((itemId) =>
-              col.remove(ClearBladeAsync.Query().equalTo('item_id', itemId)).catch((error) => {
-                console.warn(`Failed to delete forecast record ${itemId} for asset ${assetId}:`, error);
-              }),
+              col
+                .remove(ClearBladeAsync.Query().equalTo("item_id", itemId))
+                .catch(() => {
+                  //Do nothing
+                }),
             ),
           );
         } catch (error) {
@@ -569,18 +637,30 @@ const clearOldForecast = async (assetId: string, cutoffTime: Date): Promise<void
       }
     }
   } catch (error) {
-    console.error(`Error clearing old forecast data for asset ${assetId}:`, error);
+    console.error(
+      `Error clearing old forecast data for asset ${assetId}:`,
+      error,
+    );
   }
 };
 
 // rename the forecast file after adding to the asset history collection
-const markForecastAsProcessed = async (fs: FileSystem, forecastFilePath: string): Promise<void> => {
+const markForecastAsProcessed = async (
+  fs: FileSystem,
+  forecastFilePath: string,
+): Promise<void> => {
   try {
     // Create processed filename by inserting 'processed_' before the timestamp
-    const fileName = forecastFilePath.split('/').pop();
+    const fileName = forecastFilePath.split("/").pop();
     if (fileName) {
-      const processedFileName = fileName.replace(/(\d{14})\.csv$/, 'processed_$1.csv');
-      const processedPath = forecastFilePath.replace(fileName, processedFileName);
+      const processedFileName = fileName.replace(
+        /(\d{14})\.csv$/,
+        "processed_$1.csv",
+      );
+      const processedPath = forecastFilePath.replace(
+        fileName,
+        processedFileName,
+      );
 
       try {
         await fs.renameFile(forecastFilePath, processedPath);
@@ -594,13 +674,19 @@ const markForecastAsProcessed = async (fs: FileSystem, forecastFilePath: string)
 };
 
 // handle the most recently generated forecast for asset if there is a new one
-export const handleNewForecast = async (pipeline: PipelineData, assetId: string): Promise<void> => {
+export const handleNewForecast = async (
+  pipeline: PipelineData,
+  assetId: string,
+): Promise<void> => {
   try {
-    const fs = ClearBladeAsync.FS('ia-forecasting') as FileSystem;
+    const fs = ClearBladeAsync.FS("ia-forecasting") as FileSystem;
 
     const forecastFolderPath = `outbox/${assetId}/forecasts`;
 
-    const latestForecastFile = await findLatestForecastFile(fs, forecastFolderPath);
+    const latestForecastFile = await findLatestForecastFile(
+      fs,
+      forecastFolderPath,
+    );
 
     if (!latestForecastFile) {
       return;
@@ -612,19 +698,32 @@ export const handleNewForecast = async (pipeline: PipelineData, assetId: string)
       return;
     }
 
-    forecastData = alignStartTime(forecastData, pipeline.asset_management_data, assetId);
+    forecastData = alignStartTime(
+      forecastData,
+      pipeline.asset_management_data,
+      assetId,
+    );
 
     // Revert all boolean values to true or false based on attribute_type,
-    forecastData = restoreForecastBooleans(forecastData, pipeline.attributes_to_predict);
+    forecastData = restoreForecastBooleans(
+      forecastData,
+      pipeline.attributes_to_predict,
+    );
 
     // Interpolate the forecast data to have a value for every minute
     forecastData = interpolateForecastData(forecastData);
 
     // Get list of attributes that should receive forecasts
-    const attributesToPredict = pipeline.attributes_to_predict.map((attr) => attr.attribute_name);
+    const attributesToPredict = pipeline.attributes_to_predict.map(
+      (attr) => attr.attribute_name,
+    );
 
     // Update the _asset_history collection with the new forecast data
-    const updateSuccess = await updateAssetHistoryWithForecasts(assetId, forecastData, attributesToPredict);
+    const updateSuccess = await updateAssetHistoryWithForecasts(
+      assetId,
+      forecastData,
+      attributesToPredict,
+    );
 
     // Mark the forecast file as processed by renaming it
     if (updateSuccess) {
@@ -633,15 +732,21 @@ export const handleNewForecast = async (pipeline: PipelineData, assetId: string)
     }
   } catch (error) {
     console.error(`Error handling new forecast for asset ${assetId}:`, error);
-    throw new Error(`Failed to handle new forecast: ${getErrorMessage(error)}`);
+    throw new Error(`Failed to handle new forecast: ${error}`);
   }
 };
 
-const restoreForecastBooleans = (forecastData: ForecastData[], attributesToPredict: Attributes[]): ForecastData[] => {
+const restoreForecastBooleans = (
+  forecastData: ForecastData[],
+  attributesToPredict: Attributes[],
+): ForecastData[] => {
   //if attribute_name is in a key or the forecast_data, then check if that attribute_type is boolean, if so convert the value to true or false based on if the value is closer to 1 or 0
   forecastData.forEach((forecast) => {
     attributesToPredict.forEach((attr) => {
-      if (forecast.predictions[attr.attribute_name] !== undefined && attr.attribute_type === 'boolean') {
+      if (
+        forecast.predictions[attr.attribute_name] !== undefined &&
+        attr.attribute_type === "boolean"
+      ) {
         const numericValue = forecast.predictions[attr.attribute_name];
         forecast.predictions[attr.attribute_name] = numericValue >= 0.5 ? 1 : 0;
       }
@@ -650,7 +755,9 @@ const restoreForecastBooleans = (forecastData: ForecastData[], attributesToPredi
   return forecastData;
 };
 
-const interpolateForecastData = (forecastData: ForecastData[]): ForecastData[] => {
+const interpolateForecastData = (
+  forecastData: ForecastData[],
+): ForecastData[] => {
   if (forecastData.length === 0) return forecastData;
 
   // Sort data by timestamp
@@ -672,7 +779,11 @@ const interpolateForecastData = (forecastData: ForecastData[]): ForecastData[] =
   });
 
   // Generate data points every minute from start to end
-  for (let currentTime = startTime.getTime(); currentTime <= endTime.getTime(); currentTime += oneMinuteMs) {
+  for (
+    let currentTime = startTime.getTime();
+    currentTime <= endTime.getTime();
+    currentTime += oneMinuteMs
+  ) {
     const timestamp = new Date(currentTime).toISOString();
 
     // If we have exact data for this timestamp, use it
@@ -703,8 +814,14 @@ const interpolateForecastData = (forecastData: ForecastData[]): ForecastData[] =
 
     // Get all unique attribute names from surrounding data
     const allAttributes = new Set<string>();
-    if (beforeData) Object.keys(beforeData.predictions).forEach((attr) => allAttributes.add(attr));
-    if (afterData) Object.keys(afterData.predictions).forEach((attr) => allAttributes.add(attr));
+    if (beforeData)
+      Object.keys(beforeData.predictions).forEach((attr) =>
+        allAttributes.add(attr),
+      );
+    if (afterData)
+      Object.keys(afterData.predictions).forEach((attr) =>
+        allAttributes.add(attr),
+      );
 
     allAttributes.forEach((attr) => {
       const beforeValue = beforeData?.predictions[attr];
@@ -712,7 +829,9 @@ const interpolateForecastData = (forecastData: ForecastData[]): ForecastData[] =
 
       if (beforeValue !== undefined && afterValue !== undefined) {
         // We have values before and after - check if it's a boolean (0 or 1)
-        const isBoolean = (beforeValue === 0 || beforeValue === 1) && (afterValue === 0 || afterValue === 1);
+        const isBoolean =
+          (beforeValue === 0 || beforeValue === 1) &&
+          (afterValue === 0 || afterValue === 1);
 
         if (isBoolean) {
           // Forward fill for booleans
@@ -722,8 +841,10 @@ const interpolateForecastData = (forecastData: ForecastData[]): ForecastData[] =
           if (beforeData && afterData) {
             const beforeTime = new Date(beforeData.timestamp).getTime();
             const afterTime = new Date(afterData.timestamp).getTime();
-            const progress = (currentTime - beforeTime) / (afterTime - beforeTime);
-            interpolatedPredictions[attr] = beforeValue + (afterValue - beforeValue) * progress;
+            const progress =
+              (currentTime - beforeTime) / (afterTime - beforeTime);
+            interpolatedPredictions[attr] =
+              beforeValue + (afterValue - beforeValue) * progress;
           }
         }
       } else if (beforeValue !== undefined) {
@@ -759,7 +880,9 @@ const alignStartTime = (
   // Find the asset in assetManagementData
   const asset = assetManagementData.find((a) => a.id === assetId);
   if (!asset || !asset.last_inference_time) {
-    console.warn(`No last_inference_time found for asset ${assetId}, returning forecast data as-is`);
+    console.warn(
+      `No last_inference_time found for asset ${assetId}, returning forecast data as-is`,
+    );
     return forecastData;
   }
 
@@ -772,7 +895,8 @@ const alignStartTime = (
   const firstForecastTime = new Date(firstForecastTimestamp);
 
   // Calculate the time difference
-  const timeDifference = lastInferenceTime.getTime() - firstForecastTime.getTime();
+  const timeDifference =
+    lastInferenceTime.getTime() - firstForecastTime.getTime();
 
   // Shift all forecast timestamps by the difference
   const alignedForecastData = forecastData.map((forecast) => {
@@ -789,7 +913,9 @@ const alignStartTime = (
 };
 
 // Clean up asset model folders for assets that have been uninstalled or updated to use different features
-export const cleanupAssetModels = async (pipelines: PipelineData[]): Promise<void> => {
+export const cleanupAssetModels = async (
+  pipelines: PipelineData[],
+): Promise<void> => {
   try {
     const trainedAssets: string[] = [];
     pipelines.forEach((pipeline) => {
@@ -800,15 +926,15 @@ export const cleanupAssetModels = async (pipelines: PipelineData[]): Promise<voi
       });
     });
 
-    const fs = ClearBladeAsync.FS('ia-forecasting');
-    const outboxPath = 'outbox';
+    const fs = ClearBladeAsync.FS("ia-forecasting");
+    const outboxPath = "outbox";
 
     try {
       const outboxContents = await fs.readDir(outboxPath);
       const topLevelItems: Record<string, string[]> = {};
 
       for (const itemPath of outboxContents) {
-        const pathParts = itemPath.replace('/outbox/', '').split('/');
+        const pathParts = itemPath.replace("/outbox/", "").split("/");
         const topLevelName = pathParts[0];
         if (!topLevelName) continue;
         if (!topLevelItems[topLevelName]) {
@@ -842,9 +968,9 @@ export const cleanupAssetModels = async (pipelines: PipelineData[]): Promise<voi
         }
       }
     } catch (error) {
-      console.warn('Failed to read outbox directory:', error);
+      console.warn("Failed to read outbox directory:", error);
     }
   } catch (error) {
-    console.error('Error in cleanupAssetModels:', error);
+    console.error("Error in cleanupAssetModels:", error);
   }
 };

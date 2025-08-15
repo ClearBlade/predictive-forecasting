@@ -24,9 +24,12 @@ import {
   PipelineData,
   isThresholdMet,
   cleanupAssetModels,
-} from './utils';
+} from "./utils";
 
-async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServer.Resp) {
+async function c1750108753331_ForecastManager(
+  _: CbServer.BasicReq,
+  resp: CbServer.Resp,
+) {
   try {
     const currentTime = new Date();
     const currentTimeISO = currentTime.toISOString();
@@ -46,19 +49,27 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
             asset.asset_model = newAssetModel;
             pipelineUpdated = true;
             //set next train time to retrain frequency from last train time
-            const lastTrainTime = new Date(asset.last_train_time || currentTimeISO);
+            const lastTrainTime = new Date(
+              asset.last_train_time || currentTimeISO,
+            );
             asset.next_train_time = new Date(
-              lastTrainTime.getTime() + pipeline.retrain_frequency * 24 * 60 * 60 * 1000,
+              lastTrainTime.getTime() +
+                pipeline.retrain_frequency * 24 * 60 * 60 * 1000,
             ).toISOString();
             if (pipeline.retrain_frequency < 1) {
               //never retrain
               asset.next_train_time = null;
             }
-            console.log(`Updated asset model for ${asset.id}: ${newAssetModel}`);
+            console.log(
+              `Updated asset model for ${asset.id}: ${newAssetModel}`,
+            );
           }
 
           // Step 2: Check if training pipeline should run
-          const thresholdMet = await isThresholdMet(asset.id, pipeline.timestep);
+          const thresholdMet = await isThresholdMet(
+            asset.id,
+            pipeline.timestep,
+          );
           if (
             shouldRunTrainingPipeline(asset) &&
             thresholdMet &&
@@ -66,9 +77,14 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
           ) {
             const trainResult = await startTrainingPipeline(pipeline, asset);
             asset.last_train_time = currentTimeISO;
-            asset.next_train_time = new Date(currentTime.getTime() + 6 * 60 * 60 * 1000).toISOString();
+            asset.next_train_time = new Date(
+              currentTime.getTime() + 6 * 60 * 60 * 1000,
+            ).toISOString();
             if (!trainResult.error) {
-              const nextTrainTime = new Date(currentTime.getTime() + pipeline.retrain_frequency * 24 * 60 * 60 * 1000);
+              const nextTrainTime = new Date(
+                currentTime.getTime() +
+                  pipeline.retrain_frequency * 24 * 60 * 60 * 1000,
+              );
               asset.next_train_time = nextTrainTime.toISOString();
               if (pipeline.retrain_frequency < 1) {
                 asset.next_train_time = null;
@@ -77,23 +93,31 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
               console.log(`Started training pipeline for ${asset.id}`);
               continue; // Skip inference step
             } else {
-              console.error(`Training pipeline failed for ${asset.id}: ${trainResult.message}`);
+              console.error(
+                `Training pipeline failed for ${asset.id}: ${trainResult.message}`,
+              );
             }
           }
 
           // Step 3: Check if inference pipeline should run
           if (shouldRunInferencePipeline(asset)) {
-            console.log('Initializing inference pipeline');
-            const inferenceResult = await startInferencePipeline(pipeline, asset);
+            console.log("Initializing inference pipeline");
+            const inferenceResult = await startInferencePipeline(
+              pipeline,
+              asset,
+            );
             if (!inferenceResult.error) {
               asset.last_inference_time = currentTimeISO;
               const next_inference_time = new Date(
-                currentTime.getTime() + pipeline.forecast_refresh_rate * 24 * 60 * 60 * 1000,
+                currentTime.getTime() +
+                  pipeline.forecast_refresh_rate * 24 * 60 * 60 * 1000,
               );
               asset.next_inference_time = next_inference_time.toISOString();
               pipelineUpdated = true;
             } else {
-              console.error(`Inference pipeline failed for ${asset.id}: ${inferenceResult.message}`);
+              console.error(
+                `Inference pipeline failed for ${asset.id}: ${inferenceResult.message}`,
+              );
             }
           }
 
@@ -114,11 +138,11 @@ async function c1750108753331_ForecastManager(_: CbServer.BasicReq, resp: CbServ
       await updatePipelineRows(updatedPipelines);
     }
 
-    console.log('Forecast pipeline management completed successfully');
-    resp.success('Success');
+    console.log("Forecast pipeline management completed successfully");
+    resp.success("Success");
   } catch (error) {
-    console.error('Error in ForecastManager:', error);
-    resp.error('Failed to manage forecast pipelines: ' + JSON.stringify(error));
+    console.error("Error in ForecastManager:", error);
+    resp.error("Failed to manage forecast pipelines: " + JSON.stringify(error));
   }
 }
 
