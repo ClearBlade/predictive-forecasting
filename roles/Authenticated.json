@@ -37,19 +37,19 @@
             },
             {
                 "Level": 1,
+                "Name": "c1750108753331_ForecastManager"
+            },
+            {
+                "Level": 1,
+                "Name": "c1750108753331_DisplayPredictions"
+            },
+            {
+                "Level": 1,
+                "Name": "c1750108753331_AssetHistoryMigrator"
+            },
+            {
+                "Level": 1,
                 "Name": "c1750108753331_attributeRecommender"
-            },
-            {
-                "Level": 1,
-                "Name": "c1750108753331_forecastManager"
-            },
-            {
-                "Level": 1,
-                "Name": "c1750108753331_enable"
-            },
-            {
-                "Level": 1,
-                "Name": "c1750108753331_disable"
             }
         ],
         "Collections": [

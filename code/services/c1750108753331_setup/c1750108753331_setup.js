@@ -17,33 +17,34 @@ function c1750108753331_setup(req, resp) {
   const CACHE_KEY = 'google-bigquery-forecasting-config';
   const PROJECT_ID = 'clearblade-ipm';
   const DATASET_ID = 'predictive_forecasting';
-  
+
   var mySecret = {}
 
-  checkForSubscription().then(function(subscriptionExists) {
+  checkForSubscription().then(function (subscriptionExists) {
     if (subscriptionExists) {
       resp.success('Done');
     }
     return Promise.resolve();
-  }).then(function() {
+  }).then(function () {
     return readSecret();
-  }).then(function(secret) {
+  }).then(function (secret) {
     if (secret === '') {
       resp.error('secret not found: ' + SECRET_KEY)
     }
     mySecret = secret;
     return addSubscriptionRow(secret);
-  }).then(function (config){
+  }).then(function (config) {
     return generateAccessToken(config);
-  }).then(function(tokenInfo) {
+  }).then(function (tokenInfo) {
     return Promise.all([
       createBQTable(tokenInfo),
       createExternalDB(mySecret),
       createBucketSet(mySecret),
+      createBQConnectors(mySecret),
     ]);
-  }).then(function() {
+  }).then(function () {
     resp.success('Forecasting setup completed successfully!');
-  }).catch(function(err) {
+  }).catch(function (err) {
     resp.error(err);
   });
 
@@ -54,7 +55,7 @@ function c1750108753331_setup(req, resp) {
 
   function checkForSubscription() {
     const col = ClearBladeAsync.Collection('subscriptions');
-    return col.fetch(ClearBladeAsync.Query().equalTo('id', CACHE_KEY)).then(function(data) {
+    return col.fetch(ClearBladeAsync.Query().equalTo('id', CACHE_KEY)).then(function (data) {
       if (data.DATA.length > 0) {
         return Promise.resolve(true);
       }
@@ -77,9 +78,9 @@ function c1750108753331_setup(req, resp) {
       type: 'googlevertexai',
       config: JSON.stringify(config),
       id: CACHE_KEY,
-    }).then(function() {
+    }).then(function () {
       return Promise.resolve(config);
-    }).catch(function(error) {
+    }).catch(function (error) {
       return Promise.reject(error);
     });
   }
@@ -138,12 +139,12 @@ function c1750108753331_setup(req, resp) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(tableResource),
-    }).then(function(response) {
+    }).then(function (response) {
       if (!response.ok) {
         return Promise.resolve(response.text());
       }
       return Promise.resolve('BigQuery forecasting table created!');
-    }).catch(function(error) {
+    }).catch(function (error) {
       return Promise.reject(error);
     });
   }
@@ -165,13 +166,13 @@ function c1750108753331_setup(req, resp) {
       }),
       method: 'POST',
     })
-      .then(function(response) {
+      .then(function (response) {
         if (!response.ok) {
           return Promise.reject(response.text());
         }
         return Promise.resolve('External forecasting DB created!');
       })
-      .catch(function(error) {
+      .catch(function (error) {
         return Promise.reject(error);
       });
   }
@@ -186,7 +187,7 @@ function c1750108753331_setup(req, resp) {
         platform_storage: 'google',
         edge_storage: 'local',
         platform_config: {
-          bucket_name: 'clearblade-forecasting',
+          bucket_name: 'clearblade-predictive-forecasting',
           credentials: secret,
         },
         edge_config: {
@@ -195,14 +196,158 @@ function c1750108753331_setup(req, resp) {
       }),
       method: 'POST',
     })
-      .then(function(response) {
+      .then(function (response) {
         if (!response.ok) {
           return Promise.reject(response.text());
         }
         return Promise.resolve('Forecasting bucket set created!');
       })
-      .catch(function(error) {
+      .catch(function (error) {
         return Promise.reject(error);
       });
   }
-} 
+
+  function createBQConnectors(secret) {
+    return createBQConnectCollection(secret).then(function (collectionId) {
+      return Promise.all([createBatchConnector(), createCollectionConnector(collectionId)]);
+    }).catch(function (error) {
+      log('MQTT connector setup failed:', error);
+      return Promise.reject("MQTT connector setup failed: " + error);
+    });
+  }
+
+  function createBQConnectCollection(secret) {
+    return fetch('https://' + cbmeta.platform_url + '/api/v/3/collectionmanagement', {
+      method: 'POST',
+      headers: {
+        'ClearBlade-DevToken': req.userToken,
+        'ClearBlade-SystemKey': cbmeta.system_key,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        appid: cbmeta.system_key,
+        dbtype: 'bigquery',
+        is_hypertable: true,
+        dbname: 'asset_history_migration',
+        name: 'bq_asset_history',
+        tablename: PROJECT_ID + '.' + DATASET_ID + '.' + cbmeta.system_key + '_forecast',
+        authentication_type: 'json',
+        project_id: PROJECT_ID,
+        credentials: JSON.stringify(secret),
+      }),
+    }).then(function (response) {
+      if (response.ok) {
+        return response.json().then(function (result) {
+          return result.collectionID;
+        });
+      }
+
+      var textContent = response.text();
+      if (textContent.indexOf('A collection with that name already exists') !== -1) {
+        return getBQConnectCollectionId();
+      }
+      throw new Error('Failed to create BQ connect collection: ' + textContent);
+    }).catch(function (error) {
+      return Promise.reject('Failed to create BQ connect collection: ' + error);
+    });
+  }
+
+  function getBQConnectCollectionId() {
+    return fetch('https://' + cbmeta.platform_url + '/admin/allcollections?appid=' + cbmeta.system_key, {
+      method: 'GET',
+      headers: {
+        'Clearblade-Devtoken': req.userToken,
+      }
+    }).then(function (response) {
+      if (!response.ok) {
+        throw new Error('Failed to get collections: ' + response.status + ' ' + response.statusText);
+      }
+
+      var jsonResponse = response.json();
+      if (typeof jsonResponse === 'string') {
+        return JSON.parse(jsonResponse);
+      } else {
+        return jsonResponse;
+      }
+    }).then(function (collections) {
+      if (!Array.isArray(collections)) {
+        throw new Error('Collections response is not an array: ' + typeof collections);
+      }
+
+      var foundCollection = collections.find(function (collection) {
+        return collection.name === 'bq_asset_history';
+      });
+
+      if (foundCollection) {
+        return foundCollection.collectionID;
+      }
+
+      throw new Error('BQ connect collection not found in ' + collections.length + ' collections');
+    }).catch(function (error) {
+      throw new Error('Cannot retrieve existing collection ID due to API error: ' + error.message);
+    });
+  }
+
+  function createBatchConnector() {
+    return fetch('https://' + cbmeta.platform_url + '/api/v/1/mqtt-connectors/' + cbmeta.system_key + '/asset-history-batch', {
+      method: 'POST',
+      headers: {
+        'ClearBlade-DevToken': req.userToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: 'asset-history-batch',
+        type: 'batch',
+        config: {
+          batchOptions: {
+            max_batch_size: 1000,
+            max_batch_delay_seconds: 30,
+            batch_channel_size: 10000,
+          },
+          topics: {
+            'asset-history/raw': 'asset-history/batched'
+          }
+        },
+        credentials: {}
+      })
+    }).then(function (response) {
+      if (!response.ok) {
+        return Promise.reject(response.text());
+      }
+      return Promise.resolve('Batch connector created!');
+    });
+  }
+
+  function createCollectionConnector(collectionId) {
+    return fetch('https://' + cbmeta.platform_url + '/api/v/1/mqtt-connectors/' + cbmeta.system_key + '/asset-history-collection', {
+      method: 'POST',
+      headers: {
+        'ClearBlade-DevToken': req.userToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: 'asset-history-collection',
+        type: 'collection',
+        config: {
+          collection_id: collectionId,
+          topics: ['asset-history/batched'],
+          column_mapping: {
+            payload: 'data',
+            message_properties: {
+              'asset_type_id': 'asset_type_id',
+              'asset_id': 'asset_id',
+              'change_date': 'date_time'
+            }
+          },
+          payload_encoding: 'utf8'
+        },
+        credentials: {}
+      })
+    }).then(function (response) {
+      if (!response.ok) {
+        return Promise.reject(response.text());
+      }
+      return Promise.resolve('Collection connector created!');
+    });
+  }
+}

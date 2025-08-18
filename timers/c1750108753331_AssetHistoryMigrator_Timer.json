@@ -1,0 +1,8 @@
+{
+    "description": "Publishes a message to trigger the asset history migrator for the forecasting component every 5 minutes",
+    "frequency": 300,
+    "name": "c1750108753331_AssetHistoryMigrator_Timer",
+    "repeats": -1,
+    "service_name": "",
+    "start_time": "2025-08-07T21:01:00Z"
+}
