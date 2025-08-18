@@ -1,6 +1,6 @@
 import { AssetType } from "@clearblade/ia-mfe-core";
 
-type Attributes = AssetType["frontend"]["schema"][number];
+export type Attributes = AssetType["frontend"]["schema"][number];
 
 interface MQTTMessage {
   payload: string;
@@ -18,7 +18,7 @@ export interface MQTTGlobal {
   };
 }
 
-interface AssetManagementData {
+export interface AssetManagementData {
   id: string; // the asset id that forecasting will be set up for
   next_inference_time?: string | null; // the next time inference should be run
   last_inference_time?: string | null; // the last time inference was run
@@ -56,4 +56,25 @@ export interface AssetInfo {
 
 export interface LocalSyncTracker {
   [assetId: string]: string; // assetId -> last sync timestamp
+}
+
+export interface SubscriptionConfig {
+  CB_FORWARD_TOPIC: string;
+  FORWARD_TO_CB_TOPIC: boolean;
+  accessToken: string;
+  maxMessages: number;
+  pullUrl: string;
+  ackUrl: string;
+  subscriptionType: string;
+}
+
+export interface ForecastData {
+  timestamp: string;
+  predictions: Record<string, number>;
+}
+
+export interface FileSystem {
+  readDir(path: string): Promise<string[]>;
+  readFile(path: string, encoding?: string): Promise<string | Uint8Array>;
+  renameFile(oldPath: string, newPath: string): Promise<void>;
 }
