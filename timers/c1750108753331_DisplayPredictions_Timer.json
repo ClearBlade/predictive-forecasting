@@ -1,0 +1,8 @@
+{
+    "description": "Updates forecast asset to display predictions every minute",
+    "frequency": 60,
+    "name": "c1750108753331_DisplayPredictions_Timer",
+    "repeats": -1,
+    "service_name": "c1750108753331_DisplayPredictions",
+    "start_time": "2025-07-17T19:55:10Z"
+}
