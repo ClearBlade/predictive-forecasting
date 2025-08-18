@@ -21,10 +21,10 @@ import {
   startInferencePipeline,
   handleNewForecast,
   updatePipelineRows,
-  PipelineData,
   isThresholdMet,
   cleanupAssetModels,
 } from "./utils";
+import { PipelineData } from "../c1750108753331_AssetHistoryMigrator/types";
 
 async function c1750108753331_ForecastManager(
   _: CbServer.BasicReq,

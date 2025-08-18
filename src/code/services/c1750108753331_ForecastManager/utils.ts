@@ -1,4 +1,5 @@
-import { AssetType } from "@clearblade/ia-mfe-core";
+import { AssetManagementData, Attributes, PipelineData, AssetHistoryRow, SubscriptionConfig, ForecastData, FileSystem } from "../c1750108753331_AssetHistoryMigrator/types";
+
 
 const PROJECT_ID = "clearblade-ipm";
 const DATASET_ID = "predictive_forecasting";
@@ -12,59 +13,6 @@ const TRAINING_TEMPLATE_URI =
 const INFERENCE_TEMPLATE_URI =
   "https://us-central1-kfp.pkg.dev/clearblade-ipm/cb-ml-pipelines/forecast-inference-pipeline-template/sha256:f72f73fef903ea690380b82f7048233555cab44022b9ab7eaa5944b78116ed30";
 const OUTPUT_DIRECTORY = "gs://clearblade-predictive-forecasting";
-
-interface AssetManagementData {
-  id: string; //the asset id that forecasting will be set up for
-  next_inference_time?: string | null; //the next time inference should be run
-  last_inference_time?: string | null; //the last time inference was run
-  next_train_time?: string | null; //the next time training should be run
-  last_train_time?: string | null; //the last time training was run
-  last_bq_sync_time?: string | null; //the last time the asset history was synced to BigQuery
-  asset_model?: string | null; //the gsutil path to this asset's forecast model
-}
-
-type Attributes = AssetType["frontend"]["schema"][number];
-
-export interface PipelineData {
-  asset_type_id: string; //the asset type id that forecasting will be set up for
-  attributes_to_predict: Attributes[]; //list of attributes that will receive forecasts and are used as features in the model
-  supporting_attributes: Attributes[]; //list of attributes that used as features in the model but do not receive forecasts
-  asset_management_data: AssetManagementData[]; //list of assets that will receive forecasts
-  forecast_refresh_rate: number; //how often inference should be run to generate forecasts
-  retrain_frequency: number; //how often training should be run to update the model
-  forecast_length: number; //the duration of the forecast in days
-  timestep: number; //the time step of the data in minutes
-  forecast_start_date: string; //the date when inference should first start
-  latest_settings_update: string; //the last time these settings were updated
-}
-
-interface AssetHistoryRow {
-  item_id?: string;
-  asset_id: string;
-  change_date: string;
-  changes: { custom_data: Record<string, number | boolean> };
-}
-
-interface SubscriptionConfig {
-  CB_FORWARD_TOPIC: string;
-  FORWARD_TO_CB_TOPIC: boolean;
-  accessToken: string;
-  maxMessages: number;
-  pullUrl: string;
-  ackUrl: string;
-  subscriptionType: string;
-}
-
-interface ForecastData {
-  timestamp: string;
-  predictions: Record<string, number>;
-}
-
-interface FileSystem {
-  readDir(path: string): Promise<string[]>;
-  readFile(path: string, encoding?: string): Promise<string | Uint8Array>;
-  renameFile(oldPath: string, newPath: string): Promise<void>;
-}
 
 export const getPipelines = async (): Promise<PipelineData[]> => {
   const col = ClearBladeAsync.Collection<PipelineData>({
