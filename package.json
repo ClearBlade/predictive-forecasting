@@ -51,8 +51,10 @@
     "react-minimal-pie-chart": "^8.4.0",
     "react-query": "^3.39.3",
     "react-router-dom": "^6.23.1",
+    "regenerator-runtime": "^0.14.1",
     "single-spa": "^5.9.5",
-    "single-spa-react": "^4.3.1"
+    "single-spa-react": "^4.3.1",
+    "yup": "^1.6.1"
   },
   "devDependencies": {
     "@babel/core": "^7.16.7",

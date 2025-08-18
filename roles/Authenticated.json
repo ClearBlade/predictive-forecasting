@@ -38,6 +38,10 @@
             {
                 "Level": 1,
                 "Name": "c1750108753331_AssetHistoryMigrator"
+            },
+            {
+                "Level": 1,
+                "Name": "c1750108753331_attributeRecommender"
             }
         ],
         "Collections": [
