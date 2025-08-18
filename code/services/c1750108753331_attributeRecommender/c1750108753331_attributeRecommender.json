@@ -1,0 +1,21 @@
+{
+    "auto_balance": false,
+    "auto_scale": false,
+    "concurrency": 0,
+    "dependencies": "log,clearblade_async",
+    "engine_type": 0,
+    "execution_timeout": 60,
+    "log_level": "debug",
+    "log_ttl_minutes": 10080,
+    "logging_enabled": true,
+    "max_scale_concurrency": 0,
+    "min_scale_concurrency": 0,
+    "name": "c1750108753331_attributeRecommender",
+    "params": [
+        "{    \"attributes\": [        \"temperature\",         \"pressure\",         \"vibrations\",         \"speed\",         \"miles_traveled\",         \"driver_id\",         \"windshield_wiper_age\",         \"is_door_open\",         \"is_window_open\",         \"color\"    ]}"
+    ],
+    "run_on_edge": true,
+    "run_on_platform": true,
+    "run_user": "",
+    "sensitive_params": false
+}
