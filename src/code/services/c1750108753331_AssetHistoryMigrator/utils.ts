@@ -314,6 +314,13 @@ export const migrateAssetHistoryBatch = async (
         (new Date().getTime() - startTime.getTime()) / (1000 * 60),
         "minutes",
       );
+      lastProcessedTimestamp = await getLastTimestamp(assetInfo.assetId);
+      console.log(
+        "Initializing lastBQSyncTime to: ",
+        lastProcessedTimestamp,
+        "for asset: ",
+        assetInfo.assetId,
+      );
     }
 
     // Update local sync tracker if we processed any data
@@ -328,4 +335,22 @@ export const migrateAssetHistoryBatch = async (
     throw error;
   }
   return batchesProcessed;
+};
+
+const getLastTimestamp = async (assetId: string): Promise<string | null> => {
+  try {
+    const col = ClearBladeAsync.Collection("_asset_history");
+    const query = ClearBladeAsync.Query()
+      .equalTo("asset_id", assetId)
+      .setPage(0, 1)
+      .descending("change_date");
+
+    const data = await col.fetch(query);
+    return data.TOTAL > 0
+      ? (data.DATA[0] as AssetHistoryRow).change_date
+      : null;
+  } catch (error) {
+    console.error("Error getting last timestamp:", error);
+    return null;
+  }
 };
