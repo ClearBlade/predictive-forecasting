@@ -1,5 +1,12 @@
-import { AssetManagementData, Attributes, PipelineData, AssetHistoryRow, SubscriptionConfig, ForecastData, FileSystem } from "../c1750108753331_AssetHistoryMigrator/types";
-
+import {
+  AssetManagementData,
+  Attributes,
+  PipelineData,
+  AssetHistoryRow,
+  SubscriptionConfig,
+  ForecastData,
+  FileSystem,
+} from "../c1750108753331_AssetHistoryMigrator/types";
 
 const PROJECT_ID = "clearblade-ipm";
 const DATASET_ID = "predictive_forecasting";
@@ -417,9 +424,7 @@ const extractForecastData = async (
 
     return forecastData;
   } catch (error) {
-    throw new Error(
-      `Failed to extract forecast data: ${error}`,
-    );
+    throw new Error(`Failed to extract forecast data: ${error}`);
   }
 };
 
@@ -534,7 +539,7 @@ const clearOldForecast = async (
       .greaterThan("change_date", cutoffTime.toISOString())
       .ascending("change_date");
 
-    let pageNum = 0;
+    let pageNum = 1;
     const pageSize = 100;
     let hasMoreData = true;
     const recordsToDelete: string[] = [];
@@ -564,25 +569,36 @@ const clearOldForecast = async (
         hasMoreData = false;
       }
     }
+
     if (recordsToDelete.length > 0) {
+      const db = ClearBladeAsync.Database();
       const deleteBatchSize = 50;
       for (let i = 0; i < recordsToDelete.length; i += deleteBatchSize) {
         const batch = recordsToDelete.slice(i, i + deleteBatchSize);
 
         try {
-          await Promise.all(
-            batch.map((itemId) =>
-              col
-                .remove(ClearBladeAsync.Query().equalTo("item_id", itemId))
-                .catch(() => {
-                  //Do nothing
-                }),
-            ),
-          );
+          // Create a parameterized query with placeholders for the batch
+          const placeholders = batch
+            .map((_, index) => `$${index + 1}`)
+            .join(", ");
+          const deleteQuery = `DELETE FROM _asset_history WHERE item_id IN (${placeholders})`;
+
+          await db.exec(deleteQuery, ...batch);
         } catch (error) {
-          console.error(`Batch delete failed for asset ${assetId}:`, error);
+          if (i === 0) {
+            console.error(
+              `Batch delete failed for asset ${assetId}, batch ${Math.floor(i / deleteBatchSize) + 1}:`,
+              error,
+            );
+          }
         }
       }
+
+      console.log(
+        `Cleared old forecast data for asset ${assetId}, deleted ${recordsToDelete.length} records`,
+      );
+    } else {
+      console.log(`No records with predicted data found for asset ${assetId}`);
     }
   } catch (error) {
     console.error(
