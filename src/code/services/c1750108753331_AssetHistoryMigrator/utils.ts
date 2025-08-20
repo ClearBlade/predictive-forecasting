@@ -315,6 +315,12 @@ export const migrateAssetHistoryBatch = async (
         "minutes",
       );
       lastProcessedTimestamp = await getLastTimestamp(assetInfo.assetId);
+      if (
+        lastProcessedTimestamp &&
+        new Date(lastProcessedTimestamp) >= currentTime
+      ) {
+        lastProcessedTimestamp = currentTime.toISOString();
+      }
       console.log(
         "Initializing lastBQSyncTime to: ",
         lastProcessedTimestamp,
