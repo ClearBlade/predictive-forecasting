@@ -230,7 +230,7 @@ export default function ForecastingForm(
           custom_start_date: component.settings["custom_start_date"] ?? false,
           forecast_start_date: component.settings["forecast_start_date"] ?? "",
           forecast_refresh_rate:
-            (component.settings["forecast_refresh_rate"] as number) ?? 7,
+            (component.settings["forecast_refresh_rate"] as number) ?? 1,
           retrain_frequency:
             (component.settings["retrain_frequency"] as number) ?? 0,
         },
