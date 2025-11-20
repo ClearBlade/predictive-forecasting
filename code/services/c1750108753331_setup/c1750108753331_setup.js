@@ -208,7 +208,8 @@ function c1750108753331_setup(req, resp) {
   }
 
   function createBQConnectors(secret) {
-    return createBQConnectCollection(secret).then(function (collectionId) {
+    return createBQConnectCollection(secret).then(function (result) {
+      const collectionId = result.collectionID;
       return Promise.all([createBatchConnector(), createCollectionConnector(collectionId)]);
     }).catch(function (error) {
       log('MQTT connector setup failed:', error);
@@ -236,17 +237,13 @@ function c1750108753331_setup(req, resp) {
         credentials: JSON.stringify(secret),
       }),
     }).then(function (response) {
-      if (response.ok) {
-        return response.json().then(function (result) {
-          return result.collectionID;
-        });
+      if (!response.ok) {
+        var textContent = response.text();
+        if (textContent.indexOf('A collection with that name already exists') !== -1) {
+          return getBQConnectCollectionId();
+        }
       }
-
-      var textContent = response.text();
-      if (textContent.indexOf('A collection with that name already exists') !== -1) {
-        return getBQConnectCollectionId();
-      }
-      throw new Error('Failed to create BQ connect collection: ' + textContent);
+      return response.json()
     }).catch(function (error) {
       return Promise.reject('Failed to create BQ connect collection: ' + error);
     });
@@ -279,7 +276,7 @@ function c1750108753331_setup(req, resp) {
       });
 
       if (foundCollection) {
-        return foundCollection.collectionID;
+        return {collectionID: foundCollection.collectionID};
       }
 
       throw new Error('BQ connect collection not found in ' + collections.length + ' collections');
