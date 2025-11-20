@@ -36,7 +36,7 @@ export const componentEntitiesFetcherFn = async () => {
 }
 
 export function useFetchComponentEntities() {
-  const fetchResult = useQuery(['componentEntities'], componentEntitiesFetcherFn, {
+  const fetchResult = useQuery(['componentEntities', 'attribute_forecasting'], componentEntitiesFetcherFn, {
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     keepPreviousData: true,
